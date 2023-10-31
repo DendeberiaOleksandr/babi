@@ -1,0 +1,1 @@
+alter table usr add column user_role varchar(10) not null;

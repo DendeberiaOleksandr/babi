@@ -1,0 +1,1 @@
+alter table usr add column otp varchar(6);

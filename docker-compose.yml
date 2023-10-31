@@ -1,0 +1,34 @@
+version: '2'
+
+services:
+  app:
+    image: 'babi'
+    build:
+      context: .
+    networks:
+      - babi
+    container_name: babi
+    depends_on:
+      - db
+    environment:
+      - SPRING_R2DBC_URL=r2dbc:postgresql://db:5432/babi
+      - SPRING_R2DBC_USERNAME=postgres
+      - SPRING_R2DBC_PASSWORD=postgres
+      - SPRING_LIQUIBASE_URL=jdbc:postgresql://db:5432/babi
+      - SPRING_LIQUIBASE_USER=postgres
+      - SPRING_LIQUIBASE_PASSWORD=postgres
+    ports:
+      - "8080:8080"
+  db:
+    image: 'postgres:13.1-alpine'
+    container_name: db
+    ports:
+      - "5432:5432"
+    networks:
+      - babi
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+networks:
+  babi:
+    driver: bridge

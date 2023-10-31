@@ -1,0 +1,23 @@
+babi:
+  email:
+    username: oleksandr.dendeberia@gmail.com
+    password: gpty jtgn dans pyzq
+  security:
+    publicRoutes:
+      post: /api/v1/users,/api/v1/auth
+    encryption:
+      secretKey: 7O/g/MqBpsHUevFkSnNMDQ==
+    jwt:
+      secretKey: BB3OfZogHO5Hl5WnRvEvn4FV+P+aHCpYvnreqfx04RZkaSAz0zk4w3P/nZtHkNnp
+
+logging.level.org.springframework.security: DEBUG
+
+spring:
+  liquibase:
+    url: jdbc:postgresql://localhost:5432/babi
+    user: postgres
+    password: postgres
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5432/babi
+    username: postgres
+    password: postgres
