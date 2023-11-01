@@ -4,7 +4,6 @@ import org.babi.backend.category.domain.Category;
 import org.babi.backend.question.domain.Question;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.r2dbc.core.DatabaseClient;
-import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -14,7 +13,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Repository
@@ -30,14 +28,24 @@ public class QuestionRepositoryImpl implements QuestionRepository {
 
     @Override
     public Flux<Question> findAll() {
-        return databaseClient.sql("select q.id, q.text, q.icon_id, qc.category_id, c.name, qt.previous_question_id " +
-                        "from question q " +
-                        "join question_category qc " +
-                        "on q.id = qc.question_id " +
-                        "join category c " +
-                        "on qc.category_id = c.id " +
-                        "left join question_tree qt " +
-                        "on q.id = qt.question_id")
+        return findAll(null);
+    }
+
+    private Flux<Question> findAll(QuestionCriteria questionCriteria) {
+        final StringBuilder sql = new StringBuilder("select q.id, q.text, q.icon_id, qc.category_id, c.name, qt.previous_question_id " +
+                "from question q " +
+                "join question_category qc " +
+                "on q.id = qc.question_id " +
+                "join category c " +
+                "on qc.category_id = c.id " +
+                "left join question_tree qt " +
+                "on q.id = qt.question_id");
+        Map<String, Object> args = mapCriteriaToQuery(questionCriteria, sql);
+        DatabaseClient.GenericExecuteSpec executeSpec = databaseClient.sql(sql.toString());
+
+        args.forEach(executeSpec::bind);
+
+        return executeSpec
                 .map((row, rowMetadata) -> new QuestionCategoryRow(
                         row.get("id", Long.class),
                         row.get("text", String.class),
@@ -72,6 +80,38 @@ public class QuestionRepositoryImpl implements QuestionRepository {
 
                     return question;
                 })));
+    }
+
+    private Map<String, Object> mapCriteriaToQuery(QuestionCriteria questionCriteria, StringBuilder sql) {
+        Map<String, Object> args = new HashMap<>();
+        if (questionCriteria != null) {
+            boolean whereClauseAdded = false;
+            Long questionId = questionCriteria.getQuestionId();
+            if (questionId != null) {
+                appendWhereOrAndClause(whereClauseAdded, sql);
+                whereClauseAdded = true;
+                sql.append("q.id = :id");
+                args.put("id", questionId);
+            }
+
+        }
+        return args;
+    }
+
+    private void appendWhereOrAndClause(boolean whereClauseAdded, StringBuilder sql) {
+        if (whereClauseAdded) {
+            sql.append(" and ");
+        } else {
+            sql.append(" where ");
+        }
+    }
+
+    @Override
+    public Mono<Question> findById(Long id) {
+        return findAll(QuestionCriteria.builder()
+                .questionId(id)
+                .build())
+                .single();
     }
 
     private Question fromQuestionCategoryRows(List<QuestionCategoryRow> questionCategoryRows) {

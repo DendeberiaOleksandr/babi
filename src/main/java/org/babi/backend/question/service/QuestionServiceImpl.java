@@ -1,60 +1,41 @@
 package org.babi.backend.question.service;
 
-import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.babi.backend.category.service.CategoryService;
 import org.babi.backend.common.exception.ResourceNotFoundException;
 import org.babi.backend.question.dao.QuestionRepository;
 import org.babi.backend.question.domain.Question;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
 @Slf4j
 public class QuestionServiceImpl implements QuestionService {
 
-    private final QuestionRepository questionRepository;
     private final CategoryService categoryService;
-    private final Map<Long, Question> questionsCache = new HashMap<>();
+    private final QuestionRepository questionRepository;
 
     @Autowired
-    public QuestionServiceImpl(QuestionRepository questionRepository,
-                               CategoryService categoryService) {
-        this.questionRepository = questionRepository;
+    public QuestionServiceImpl(CategoryService categoryService,
+                               QuestionRepository questionRepository) {
         this.categoryService = categoryService;
-    }
-
-    @EventListener(ApplicationReadyEvent.class)
-    public void onApplicationReadyEvent() {
-        questionRepository.findAll()
-                .collectList()
-                .flatMapMany(questions -> Flux.fromStream(questions.stream()))
-                .map(question -> {
-                    questionsCache.put(question.getId(), question);
-                    return question;
-                })
-                .blockLast();
-        Flux.fromStream(questionsCache.values().stream())
-                .map(question -> {
-                    questionsCache.get(question.getId()).setPreviousQuestions(question.getPreviousQuestionsId().stream().map(questionsCache::get).collect(Collectors.toList()));
-                    return question;
-                })
-                .subscribe();
+        this.questionRepository = questionRepository;
     }
 
     @Override
     public Flux<Question> findAll() {
-        return Flux.fromStream(questionsCache.values().stream());
+        return questionRepository.findAll();
+    }
+
+    @Override
+    public Mono<Question> findById(Long id) {
+        return questionRepository.findById(id);
     }
 
     @Transactional

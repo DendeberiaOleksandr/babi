@@ -7,6 +7,7 @@ import reactor.core.publisher.Mono;
 public interface QuestionService {
 
     Flux<Question> findAll();
+    Mono<Question> findById(Long id);
     Mono<Long> save(Question question);
     Mono<Long> update(Question question);
     Mono<Void> addPreviousQuestion(Long questionId, Long previousQuestionId);

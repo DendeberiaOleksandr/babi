@@ -9,6 +9,7 @@ import java.util.List;
 public interface QuestionRepository {
 
     Flux<Question> findAll();
+    Mono<Question> findById(Long id);
     Mono<Question> save(Question question);
     Mono<Question> update(Question question);
     Mono<Long> linkCategories(Long questionId, List<Long> categoriesId);
