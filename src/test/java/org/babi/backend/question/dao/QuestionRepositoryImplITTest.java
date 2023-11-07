@@ -6,7 +6,6 @@ import org.babi.backend.dao.AbstractDaoITTest;
 import org.babi.backend.image.dao.ImageRepository;
 import org.babi.backend.image.domain.Image;
 import org.babi.backend.question.domain.Question;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,15 +31,18 @@ class QuestionRepositoryImplITTest extends AbstractDaoITTest {
     @Autowired
     private DatabaseClient databaseClient;
 
-
-    @BeforeEach
-    void setUp() {
-        questionRepository = new QuestionRepositoryImpl(databaseClient);
+    @Autowired
+    public QuestionRepositoryImplITTest(ImageRepository imageRepository, CategoryRepository categoryRepository, DatabaseClient databaseClient) {
+        this.questionRepository = new QuestionRepositoryImpl(databaseClient);
+        this.imageRepository = imageRepository;
+        this.categoryRepository = categoryRepository;
+        this.databaseClient = databaseClient;
     }
 
-    @AfterEach
+    @BeforeEach
     void restoreDatabase() {
         questionRepository.deleteAll().block();
+        categoryRepository.deleteAll().block();
     }
 
     @Test
@@ -202,6 +204,62 @@ class QuestionRepositoryImplITTest extends AbstractDaoITTest {
         Set<Long> previousQuestionsId = result.getPreviousQuestionsId();
         assertNotNull(previousQuestionsId);
         assertEquals(1, previousQuestionsId.size());
+    }
+
+    @Test
+    void unlinkPreviousQuestions_whenQuestionIsLinked_thenUnlink() {
+        // given
+        Image image = imageRepository.save(new Image(null, new byte[]{}, LocalDateTime.now())).block();
+        Category category = categoryRepository.save(new Category(null, "category")).block();
+        final Question question1 = new Question(null, "text", image.getId(), image, Set.of(category.getId()), List.of(category), null, null, 0, 0);
+        final Question question2 = new Question(null, "text", image.getId(), image, Set.of(category.getId()), List.of(category), null, null, 0, 0);
+        Question dbQuestion1 = questionRepository.save(question1).block();
+        Question dbQuestion2 = questionRepository.save(question2).block();
+        questionRepository.linkCategories(dbQuestion1.getId(), Set.of(category.getId())).block();
+        questionRepository.linkPreviousQuestions(dbQuestion1.getId(), Set.of(dbQuestion2.getId())).block();
+
+        // when
+        questionRepository.unlinkPreviousQuestions(dbQuestion1.getId(), Set.of(dbQuestion2.getId())).block();
+
+        // then
+        Question result = questionRepository.findById(dbQuestion1.getId()).block();
+        assertNotNull(result);
+        Set<Long> previousQuestionsId = result.getPreviousQuestionsId();
+        assertNotNull(previousQuestionsId);
+        assertTrue(previousQuestionsId.isEmpty());
+    }
+
+    @Test
+    void getQuestionCategoriesId_whenCategoriesExist_thenReturnCategoriesId() {
+        // given
+        Image image = imageRepository.save(new Image(null, new byte[]{}, LocalDateTime.now())).block();
+        Category category = categoryRepository.save(new Category(null, "category")).block();
+        Question question = questionRepository.save(new Question(null, "text", image.getId(), image, Set.of(category.getId()), List.of(category), null, null, 0, 0)).block();
+        questionRepository.linkCategories(question.getId(), Set.of(category.getId())).block();
+
+        // when
+        List<Long> categoriesId = questionRepository.getQuestionCategoriesId(question.getId()).collectList().block();
+
+        // then
+        assertNotNull(categoriesId);
+        assertEquals(1, categoriesId.size());
+    }
+
+    @Test
+    void deleteAll_whenThereIsAtLeastOneQuestion_thenShouldBeDeleted() {
+        // given
+        Image image = imageRepository.save(new Image(null, new byte[]{}, LocalDateTime.now())).block();
+        Category category = categoryRepository.save(new Category(null, "category")).block();
+        Question question = questionRepository.save(new Question(null, "text", image.getId(), image, Set.of(category.getId()), List.of(category), null, null, 0, 0)).block();
+        questionRepository.linkCategories(question.getId(), Set.of(category.getId())).block();
+
+        // when
+        questionRepository.deleteAll().block();
+
+        // then
+        List<Question> result = questionRepository.findAll().collectList().block();
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
     }
 
 }
