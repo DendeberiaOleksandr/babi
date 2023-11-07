@@ -11,6 +11,7 @@ import org.babi.backend.category.domain.Category;
 import org.babi.backend.image.domain.Image;
 
 import java.util.List;
+import java.util.Set;
 
 @AllArgsConstructor
 @NoArgsConstructor
@@ -27,9 +28,11 @@ public class Question {
     private Long iconId;
     private Image image;
 
-    private List<Long> categoriesId;
+    private Set<Long> categoriesId;
     private List<Category> categories;
 
-    private List<Long> previousQuestionsId;
+    private Set<Long> previousQuestionsId;
     private List<Question> previousQuestions;
+    private int x;
+    private int y;
 }

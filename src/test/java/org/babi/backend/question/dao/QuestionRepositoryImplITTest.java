@@ -6,20 +6,16 @@ import org.babi.backend.dao.AbstractDaoITTest;
 import org.babi.backend.image.dao.ImageRepository;
 import org.babi.backend.image.domain.Image;
 import org.babi.backend.question.domain.Question;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.r2dbc.core.DatabaseClient;
-import reactor.core.publisher.Flux;
-import reactor.test.StepVerifier;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.stream.Stream;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -42,38 +38,47 @@ class QuestionRepositoryImplITTest extends AbstractDaoITTest {
         questionRepository = new QuestionRepositoryImpl(databaseClient);
     }
 
+    @AfterEach
+    void restoreDatabase() {
+        questionRepository.deleteAll().block();
+    }
+
     @Test
     void findAll_whenThereAreNoQuestions_thenExpectEmpty() {
         // given
 
         // when
-        Flux<Question> actual = questionRepository.findAll();
+        List<Question> result = questionRepository.findAll().collectList().block();
 
         // then
-        StepVerifier.create(actual)
-                .expectComplete()
-                .verify();
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
     }
 
-    @ParameterizedTest
-    @MethodSource("provideQuestionsForeignKeyViolation")
-    void save_whenProvidedForeignEntityKeyDoesNotExist_thenExpectException(Question question) {
+    @Test
+    void findById_whenThereIsQuestionWithProvidedId_thenShouldBeFound() {
+        // given
+        Image image = imageRepository.save(new Image(null, new byte[]{}, LocalDateTime.now())).block();
+        Category category = categoryRepository.save(new Category(null, "category")).block();
+        Question question = questionRepository.save(new Question(null, "text", image.getId(), image, Set.of(category.getId()), List.of(category), null, null, 0, 0)).block();
+        questionRepository.linkCategories(question.getId(), Set.of(category.getId())).block();
+
+        // when
+        Question result = questionRepository.findById(question.getId()).block();
+
+        // then
+        assertNotNull(result);
+        assertEquals(question.getId(), result.getId());
+    }
+
+    @Test
+    void save_whenProvidedForeignEntityKeyDoesNotExist_thenExpectException() {
         // given
 
         // when
-        Flux<Question> actual = questionRepository.save(question)
-                .flatMapMany(q -> questionRepository.findAll());
+        assertThrows(IllegalArgumentException.class, () -> questionRepository.save(new Question(null, "text", null, null, null, null, null, null, 0, 0)).block());
 
         // then
-        StepVerifier.create(actual)
-                .expectError(DataIntegrityViolationException.class)
-                .verify();
-    }
-
-    private static Stream<Arguments> provideQuestionsForeignKeyViolation() {
-        return Stream.of(
-                Arguments.of(new Question(null, "text", 1L, null, null, null, null, null))
-        );
     }
 
     @Test
@@ -81,7 +86,7 @@ class QuestionRepositoryImplITTest extends AbstractDaoITTest {
         // given
         final Image image = new Image(null, new byte[]{}, LocalDateTime.now());
         final Category category = new Category(null, "category");
-        final Question question = new Question(null, "text", null, image, null, List.of(category), null, null);
+        final Question question = new Question(null, "text", null, image, null, List.of(category), null, null, 0, 0);
 
         // when
         imageRepository.save(image)
@@ -94,7 +99,7 @@ class QuestionRepositoryImplITTest extends AbstractDaoITTest {
                 .flatMap(c -> {
                     Long categoryId = c.getId();
                     category.setId(categoryId);
-                    question.setCategoriesId(List.of(categoryId));
+                    question.setCategoriesId(Set.of(categoryId));
                     return questionRepository.save(question);
                 })
                 .flatMap(q -> questionRepository.linkCategories(q.getId(), q.getCategoriesId()))
@@ -107,12 +112,96 @@ class QuestionRepositoryImplITTest extends AbstractDaoITTest {
         assertNotNull(result);
         assertNotNull(result.getId());
         assertNotNull(result.getIconId());
-        List<Long> categoriesId = result.getCategoriesId();
+        Set<Long> categoriesId = result.getCategoriesId();
         assertNotNull(categoriesId);
         assertFalse(categoriesId.isEmpty());
         List<Category> categories = result.getCategories();
         assertNotNull(categories);
         assertFalse(categories.isEmpty());
+    }
+
+    @Test
+    void linkCategories_whenQuestionDoesNotExist_thenThrowException() {
+        // given
+
+        // when
+        assertThrows(DataIntegrityViolationException.class, () -> questionRepository.linkCategories(1L, Set.of(1L, 2L, 3L)).block());
+
+        // then
+    }
+
+    @Test
+    void linkCategories_whenQuestionAndCategoryExist_thenLink() {
+        // given
+        final Image image = new Image(null, new byte[]{}, LocalDateTime.now());
+        final Question question = new Question(null, "text", null, image, null, null, null, null, 0, 0);
+
+        // when
+        Question dbQuestion = imageRepository.save(image)
+                .flatMap(i -> {
+                    Long imageId = i.getId();
+                    image.setId(imageId);
+                    question.setIconId(imageId);
+                    return questionRepository.save(question);
+                }).block();
+        Category category = categoryRepository.save(new Category(null, "category")).block();
+        questionRepository.linkCategories(dbQuestion.getId(), Set.of(category.getId())).block();
+        Question result = questionRepository.findAll().blockFirst();
+
+        // then
+        assertNotNull(result);
+        Set<Long> resultCategoriesId = result.getCategoriesId();
+        assertNotNull(resultCategoriesId);
+        assertEquals(1, resultCategoriesId.size());
+    }
+
+    @Test
+    void unlinkCategories_whenQuestionExistAndCategoryIsAlreadyLinked_thenUnlink() {
+        // given
+        final Image image = new Image(null, new byte[]{}, LocalDateTime.now());
+        final Question question = new Question(null, "text", null, image, null, null, null, null, 0, 0);
+        Question dbQuestion = imageRepository.save(image)
+                .flatMap(i -> {
+                    Long imageId = i.getId();
+                    image.setId(imageId);
+                    question.setIconId(imageId);
+                    return questionRepository.save(question);
+                }).block();
+        Category category1 = categoryRepository.save(new Category(null, "category")).block();
+        Category category2 = categoryRepository.save(new Category(null, "category")).block();
+        questionRepository.linkCategories(dbQuestion.getId(), Set.of(category1.getId(), category2.getId())).block();
+
+        // when
+        questionRepository.unlinkCategories(dbQuestion.getId(), Set.of(category2.getId())).block();
+        Question result = questionRepository.findAll().blockFirst();
+
+        // then
+        assertNotNull(result);
+        Set<Long> resultCategoriesId = result.getCategoriesId();
+        assertNotNull(resultCategoriesId);
+        assertEquals(1, resultCategoriesId.size());
+    }
+
+    @Test
+    void linkPreviousQuestions_whenBothQuestionsExist_thenLink() {
+        // given
+        Image image = imageRepository.save(new Image(null, new byte[]{}, LocalDateTime.now())).block();
+        Category category = categoryRepository.save(new Category(null, "category")).block();
+        final Question question1 = new Question(null, "text", image.getId(), image, Set.of(category.getId()), List.of(category), null, null, 0, 0);
+        final Question question2 = new Question(null, "text", image.getId(), image, Set.of(category.getId()), List.of(category), null, null, 0, 0);
+        Question dbQuestion1 = questionRepository.save(question1).block();
+        Question dbQuestion2 = questionRepository.save(question2).block();
+        questionRepository.linkCategories(dbQuestion1.getId(), Set.of(category.getId())).block();
+
+        // when
+        questionRepository.linkPreviousQuestions(dbQuestion1.getId(), Set.of(dbQuestion2.getId())).block();
+
+        // then
+        Question result = questionRepository.findById(dbQuestion1.getId()).block();
+        assertNotNull(result);
+        Set<Long> previousQuestionsId = result.getPreviousQuestionsId();
+        assertNotNull(previousQuestionsId);
+        assertEquals(1, previousQuestionsId.size());
     }
 
 }

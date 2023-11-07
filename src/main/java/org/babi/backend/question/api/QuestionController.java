@@ -18,6 +18,9 @@ import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+import java.util.Set;
+
 @RestController
 @RequestMapping("/api/v1/questions")
 public class QuestionController {
@@ -49,21 +52,27 @@ public class QuestionController {
     }
 
     @Secured("hasRole('ADMIN')")
-    @PutMapping
-    public Mono<ResponseEntity<?>> update(@RequestBody Question question) {
+    @PutMapping("/{id}")
+    public Mono<ResponseEntity<?>> update(@PathVariable Long id, @RequestBody Question question) {
         return questionService.update(question).map(ResponseEntity::ok);
     }
 
     @Secured("hasRole('ADMIN')")
+    @PutMapping
+    public Flux<Long> updateAll(@RequestBody List<Question> question) {
+        return questionService.updateAll(question);
+    }
+
+    @Secured("hasRole('ADMIN')")
     @PutMapping("/{questionId}/previousQuestions")
-    public Mono<ResponseEntity<?>> addPreviousQuestion(@PathVariable("questionId") Long questionId, @RequestBody Long previousQuestionId) {
-        return questionService.addPreviousQuestion(questionId, previousQuestionId).map(ResponseEntity::ok);
+    public Mono<ResponseEntity<?>> addPreviousQuestion(@PathVariable("questionId") Long questionId, @RequestBody Set<Long> previousQuestionsId) {
+        return questionService.addPreviousQuestions(questionId, previousQuestionsId).map(ResponseEntity::ok);
     }
 
     @Secured("hasRole('ADMIN')")
     @DeleteMapping("/{questionId}/previousQuestions/{previousQuestionId}")
-    public Mono<ResponseEntity<?>> removePreviousQuestion(@PathVariable("questionId") Long questionId, @PathVariable("previousQuestionId") Long previousQuestionId) {
-        return questionService.addPreviousQuestion(questionId, previousQuestionId).map(ResponseEntity::ok);
+    public Mono<ResponseEntity<?>> removePreviousQuestion(@PathVariable("questionId") Long questionId, @PathVariable("previousQuestionId") Set<Long> previousQuestionsId) {
+        return questionService.addPreviousQuestions(questionId, previousQuestionsId).map(ResponseEntity::ok);
     }
 
 }

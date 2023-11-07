@@ -4,12 +4,16 @@ import org.babi.backend.question.domain.Question;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+import java.util.Set;
+
 public interface QuestionService {
 
     Flux<Question> findAll();
     Mono<Question> findById(Long id);
     Mono<Long> save(Question question);
     Mono<Long> update(Question question);
-    Mono<Void> addPreviousQuestion(Long questionId, Long previousQuestionId);
-    Mono<Void> removePreviousQuestion(Long questionId, Long previousQuestionId);
+    Flux<Long> updateAll(List<Question> questions);
+    Mono<Long> addPreviousQuestions(Long questionId, Set<Long> previousQuestionsId);
+    Mono<Long> removePreviousQuestions(Long questionId, Set<Long> previousQuestionsId);
 }

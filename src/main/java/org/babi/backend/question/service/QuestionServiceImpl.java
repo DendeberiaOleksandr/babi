@@ -12,6 +12,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -51,10 +52,16 @@ public class QuestionServiceImpl implements QuestionService {
     @Override
     public Mono<Long> update(Question question) {
         return questionRepository.update(question)
+                .flatMap(this::updateQuestionCategories)
+                .flatMap(questionId -> updateQuestionPreviousQuestions(question));
+    }
+
+    private Mono<Long> updateQuestionCategories(Question question) {
+        return questionRepository.findById(question.getId())
                 .flatMap(dbQuestion -> questionRepository.getQuestionCategoriesId(question.getId()).collectList().flatMap(dbCategoriesId -> {
-                            List<Long> categoriesId = question.getCategoriesId();
-                            List<Long> oldCategoriesId = dbCategoriesId.stream()
-                                    .filter(dbCategoryId -> !categoriesId.contains(dbCategoryId)).collect(Collectors.toList());
+                            Set<Long> categoriesId = question.getCategoriesId();
+                            Set<Long> oldCategoriesId = dbCategoriesId.stream()
+                                    .filter(dbCategoryId -> !categoriesId.contains(dbCategoryId)).collect(Collectors.toSet());
                             if (oldCategoriesId.isEmpty()) {
                                 return Mono.just(dbQuestion.getId());
                             }
@@ -63,25 +70,55 @@ public class QuestionServiceImpl implements QuestionService {
                 )
                 .flatMap(oldCategoriesId -> questionRepository.getQuestionCategoriesId(question.getId()).collectList())
                 .flatMap(dbCategoriesId -> {
-                    List<Long> categoriesIdToLink = question.getCategoriesId().stream().filter(newCategoryId -> !dbCategoriesId.contains(newCategoryId)).collect(Collectors.toList());
+                    Set<Long> categoriesIdToLink = question.getCategoriesId().stream().filter(newCategoryId -> !dbCategoriesId.contains(newCategoryId)).collect(Collectors.toSet());
                     if (categoriesIdToLink.isEmpty()) {
                         return Mono.just(question.getId());
                     }
                     return questionRepository.linkCategories(question.getId(),
-                            categoriesIdToLink).thenReturn(question.getId());
+                            categoriesIdToLink);
+                });
+    }
+
+    private Mono<Long> updateQuestionPreviousQuestions(Question question) {
+        return questionRepository.findById(question.getId())
+                .flatMap(dbQuestion -> {
+                    Set<Long> previousQuestionsId = question.getPreviousQuestionsId();
+                    Set<Long> oldPreviousQuestionsId = dbQuestion.getPreviousQuestionsId().stream()
+                            .filter(dbPrevQuestionId -> !previousQuestionsId.contains(dbPrevQuestionId))
+                            .collect(Collectors.toSet());
+                    if (oldPreviousQuestionsId.isEmpty()) {
+                        return Mono.just(dbQuestion);
+                    }
+                    return questionRepository.unlinkPreviousQuestions(dbQuestion.getId(), oldPreviousQuestionsId)
+                            .map(questionId -> dbQuestion.getPreviousQuestionsId());
+                })
+                .flatMap(oldPreviousQuestionsId -> questionRepository.findPreviousQuestionsId(question.getId()).collectList())
+                .flatMap(dbPreviousQuestionsId -> {
+                    Set<Long> previousQuestionsIdToLink = question.getPreviousQuestionsId().stream().filter(newPreviousQuestionId -> !dbPreviousQuestionsId.contains(newPreviousQuestionId)).collect(Collectors.toSet());
+                    if(previousQuestionsIdToLink.isEmpty()) {
+                        return Mono.just(question.getId());
+                    }
+                    return questionRepository.linkPreviousQuestions(question.getId(), previousQuestionsIdToLink);
                 });
     }
 
     @Transactional
     @Override
-    public Mono<Void> addPreviousQuestion(Long questionId, Long previousQuestionId) {
-        return questionRepository.linkPreviousQuestion(questionId, previousQuestionId);
+    public Flux<Long> updateAll(List<Question> questions) {
+        return Flux.fromStream(questions.stream())
+                .flatMap(this::update);
     }
 
     @Transactional
     @Override
-    public Mono<Void> removePreviousQuestion(Long questionId, Long previousQuestionId) {
-        return questionRepository.unlinkPreviousQuestion(questionId, previousQuestionId);
+    public Mono<Long> addPreviousQuestions(Long questionId, Set<Long> previousQuestionsId) {
+        return questionRepository.linkPreviousQuestions(questionId, previousQuestionsId);
+    }
+
+    @Transactional
+    @Override
+    public Mono<Long> removePreviousQuestions(Long questionId, Set<Long> previousQuestionsId) {
+        return questionRepository.unlinkPreviousQuestions(questionId, previousQuestionsId);
     }
 
 
