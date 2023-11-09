@@ -29,3 +29,9 @@ databaseChangeLog:
   - include:
       file: changes/010-add-default-constraint-to-question-position-column.sql
       relativeToChangelogFile: true
+  - include:
+      file: changes/011-create-place-table.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/012-add-place-state-column.sql
+      relativeToChangelogFile: true

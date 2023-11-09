@@ -2,64 +2,37 @@ package org.babi.backend.common.dao;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.util.StringUtils;
 
-import java.util.List;
-import java.util.stream.Stream;
+import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @ExtendWith(MockitoExtension.class)
 class DaoUtilTest {
 
     @Test
-    void buildValuesTuple_whenNullListProvided_thenReturnEmptyString() {
+    void buildUnlinkQuery_whenAllArgsProvided_thenShouldBuildSQL() {
         // given
+        String expected = "delete from table where id = :id and nested_id in (1)";
 
         // when
-        String result = DaoUtil.buildValuesTuple(null);
+        String result = DaoUtil.buildUnlinkQuery("table", Set.of(1L), "id", "id", "nested_id");
 
         // then
-        assertFalse(StringUtils.hasText(result));
+        assertEquals(expected, result);
     }
 
-    @ParameterizedTest
-    @MethodSource("provideTuples")
-    void buildValuesTuple_whenOneTupleWithOneValueProvided_thenReturnTuple(String expectedResult, List<List<Object>> values) {
+    @Test
+    void buildLinkQuery_whenAllArgsProvided_thenShouldBuildSQL() {
         // given
+        String expected = "insert into table(id, nested_id) values (1, 1)";
 
         // when
-        String result = DaoUtil.buildValuesTuple(values);
+        String result = DaoUtil.buildLinkQuery("table", 1L, Set.of(1L), "id", "nested_id");
 
         // then
-        assertEquals(expectedResult, result);
-    }
-
-    private static Stream<Arguments> provideTuples() {
-        return Stream.of(
-                Arguments.of("(1)", List.of(
-                        List.of("1")
-                )),
-                Arguments.of("(1, 2)", List.of(
-                        List.of("1", "2")
-                )),
-                Arguments.of("(1), (1)", List.of(
-                        List.of("1"),
-                        List.of("1")
-                )),
-                Arguments.of("(1, 2), (1)", List.of(
-                        List.of("1", "2"),
-                        List.of("1")
-                )),
-                Arguments.of("(1, 2), (1, 2)", List.of(
-                        List.of("1", "2"),
-                        List.of("1", "2")
-                ))
-        );
+        assertEquals(expected, result);
     }
 
 }

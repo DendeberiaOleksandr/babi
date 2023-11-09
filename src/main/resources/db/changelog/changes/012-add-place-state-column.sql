@@ -1,0 +1,1 @@
+alter table place add column place_state varchar(50) not null default 'HIDDEN';

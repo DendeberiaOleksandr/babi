@@ -6,7 +6,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.annotation.Secured;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,7 +18,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
-import java.util.Set;
 
 @RestController
 @RequestMapping("/api/v1/questions")
@@ -61,18 +59,6 @@ public class QuestionController {
     @PutMapping
     public Flux<Long> updateAll(@RequestBody List<Question> question) {
         return questionService.updateAll(question);
-    }
-
-    @Secured("hasRole('ADMIN')")
-    @PutMapping("/{questionId}/previousQuestions")
-    public Mono<ResponseEntity<?>> addPreviousQuestion(@PathVariable("questionId") Long questionId, @RequestBody Set<Long> previousQuestionsId) {
-        return questionService.addPreviousQuestions(questionId, previousQuestionsId).map(ResponseEntity::ok);
-    }
-
-    @Secured("hasRole('ADMIN')")
-    @DeleteMapping("/{questionId}/previousQuestions/{previousQuestionId}")
-    public Mono<ResponseEntity<?>> removePreviousQuestion(@PathVariable("questionId") Long questionId, @PathVariable("previousQuestionId") Set<Long> previousQuestionsId) {
-        return questionService.addPreviousQuestions(questionId, previousQuestionsId).map(ResponseEntity::ok);
     }
 
 }

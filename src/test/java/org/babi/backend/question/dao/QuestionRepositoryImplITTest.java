@@ -2,6 +2,7 @@ package org.babi.backend.question.dao;
 
 import org.babi.backend.category.dao.CategoryRepository;
 import org.babi.backend.category.domain.Category;
+import org.babi.backend.common.exception.ResourceNotFoundException;
 import org.babi.backend.dao.AbstractDaoITTest;
 import org.babi.backend.image.dao.ImageRepository;
 import org.babi.backend.image.domain.Image;
@@ -63,7 +64,6 @@ class QuestionRepositoryImplITTest extends AbstractDaoITTest {
         Image image = imageRepository.save(new Image(null, new byte[]{}, LocalDateTime.now())).block();
         Category category = categoryRepository.save(new Category(null, "category")).block();
         Question question = questionRepository.save(new Question(null, "text", image.getId(), image, Set.of(category.getId()), List.of(category), null, null, 0, 0)).block();
-        questionRepository.linkCategories(question.getId(), Set.of(category.getId())).block();
 
         // when
         Question result = questionRepository.findById(question.getId()).block();
@@ -71,6 +71,16 @@ class QuestionRepositoryImplITTest extends AbstractDaoITTest {
         // then
         assertNotNull(result);
         assertEquals(question.getId(), result.getId());
+    }
+
+    @Test
+    void findById_whenThereIsNoQuestionWithProvidedId_thenShouldThrowException() {
+        // given
+
+        // when
+        assertThrows(ResourceNotFoundException.class, () -> questionRepository.findById(1L).block());
+
+        // then
     }
 
     @Test
@@ -104,7 +114,6 @@ class QuestionRepositoryImplITTest extends AbstractDaoITTest {
                     question.setCategoriesId(Set.of(categoryId));
                     return questionRepository.save(question);
                 })
-                .flatMap(q -> questionRepository.linkCategories(q.getId(), q.getCategoriesId()))
                 .block();
 
         Question result = questionRepository.findAll().blockFirst();
@@ -235,7 +244,6 @@ class QuestionRepositoryImplITTest extends AbstractDaoITTest {
         Image image = imageRepository.save(new Image(null, new byte[]{}, LocalDateTime.now())).block();
         Category category = categoryRepository.save(new Category(null, "category")).block();
         Question question = questionRepository.save(new Question(null, "text", image.getId(), image, Set.of(category.getId()), List.of(category), null, null, 0, 0)).block();
-        questionRepository.linkCategories(question.getId(), Set.of(category.getId())).block();
 
         // when
         List<Long> categoriesId = questionRepository.getQuestionCategoriesId(question.getId()).collectList().block();
@@ -250,8 +258,7 @@ class QuestionRepositoryImplITTest extends AbstractDaoITTest {
         // given
         Image image = imageRepository.save(new Image(null, new byte[]{}, LocalDateTime.now())).block();
         Category category = categoryRepository.save(new Category(null, "category")).block();
-        Question question = questionRepository.save(new Question(null, "text", image.getId(), image, Set.of(category.getId()), List.of(category), null, null, 0, 0)).block();
-        questionRepository.linkCategories(question.getId(), Set.of(category.getId())).block();
+        questionRepository.save(new Question(null, "text", image.getId(), image, Set.of(category.getId()), List.of(category), null, null, 0, 0)).block();
 
         // when
         questionRepository.deleteAll().block();

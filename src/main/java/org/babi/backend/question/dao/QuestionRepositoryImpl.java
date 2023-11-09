@@ -1,10 +1,13 @@
 package org.babi.backend.question.dao;
 
 import org.babi.backend.category.domain.Category;
+import org.babi.backend.common.dao.DaoUtil;
+import org.babi.backend.common.exception.ResourceNotFoundException;
 import org.babi.backend.question.domain.Question;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Repository;
+import org.springframework.util.CollectionUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -51,7 +54,10 @@ public class QuestionRepositoryImpl implements QuestionRepository {
                 "on qc.category_id = c.id " +
                 "left join question_tree qt " +
                 "on q.id = qt.question_id");
-        Map<String, Object> args = mapCriteriaToQuery(questionCriteria, sql);
+        Map<String, Object> args = new HashMap<>();
+        if (questionCriteria != null) {
+            args = questionCriteria.mapCriteriaToQueryArgs(sql);
+        }
         DatabaseClient.GenericExecuteSpec executeSpec = databaseClient.sql(sql.toString());
 
         for (Map.Entry<String, Object> arg : args.entrySet()) {
@@ -106,36 +112,9 @@ public class QuestionRepositoryImpl implements QuestionRepository {
                 }).flatMapMany(questions -> Flux.fromStream(questions.stream()));
     }
 
-    private Map<String, Object> mapCriteriaToQuery(QuestionCriteria questionCriteria, StringBuilder sql) {
-        Map<String, Object> args = new HashMap<>();
-        if (questionCriteria != null) {
-            boolean whereClauseAdded = false;
-            Long questionId = questionCriteria.getQuestionId();
-            if (questionId != null) {
-                appendWhereOrAndClause(whereClauseAdded, sql);
-                whereClauseAdded = true;
-                sql.append("q.id = :id");
-                args.put("id", questionId);
-            }
-
-        }
-        return args;
-    }
-
-    private void appendWhereOrAndClause(boolean whereClauseAdded, StringBuilder sql) {
-        if (whereClauseAdded) {
-            sql.append(" and ");
-        } else {
-            sql.append(" where ");
-        }
-    }
-
     @Override
     public Mono<Question> findById(Long id) {
-        return findAll(QuestionCriteria.builder()
-                .questionId(id)
-                .build())
-                .single();
+        return findAll(new QuestionCriteria(id)).switchIfEmpty(Mono.error(new ResourceNotFoundException(Question.class, "id", id))).single();
     }
 
     @Override
@@ -146,6 +125,8 @@ public class QuestionRepositoryImpl implements QuestionRepository {
                 .filter((statement, executeFunction) -> statement.returnGeneratedValues("id").execute())
                 .fetch().first()
                 .doOnNext(result -> question.setId(Long.parseLong(result.get("id").toString())))
+                .flatMap(result -> linkCategories(question.getId(), question.getCategoriesId()))
+                .flatMap(questionId -> linkPreviousQuestions(questionId, question.getPreviousQuestionsId()))
                 .thenReturn(question);
 
     }
@@ -160,11 +141,19 @@ public class QuestionRepositoryImpl implements QuestionRepository {
                 .bind("y", question.getY())
                 .fetch()
                 .all()
-                .then(Mono.just(question));
+                .then(Mono.just(question))
+                .flatMap(q -> unlinkCategories(q.getId()))
+                .flatMap(questionId -> linkCategories(questionId, question.getCategoriesId()))
+                .flatMap(this::unlinkPreviousQuestions)
+                .flatMap(questionId -> linkPreviousQuestions(questionId, question.getPreviousQuestionsId()))
+                .thenReturn(question);
     }
 
     @Override
     public Mono<Long> linkCategories(Long questionId, Set<Long> categories) {
+        if (CollectionUtils.isEmpty(categories)) {
+            return Mono.just(questionId);
+        }
         String sql = buildLinkCategoriesSQL(questionId, categories);
         return databaseClient.sql(sql)
                 .fetch()
@@ -173,30 +162,39 @@ public class QuestionRepositoryImpl implements QuestionRepository {
     }
 
     private String buildLinkCategoriesSQL(Long questionId, Set<Long> categories) {
-        final StringBuilder sql = new StringBuilder("insert into question_category(question_id, category_id) values ");
-        categories.forEach(categoryId -> sql.append(String.format("(%d, %d), ", questionId, categoryId)));
-        final int length = sql.length();
-        return sql.replace(length - 2, length, "").toString();
+        return DaoUtil.buildLinkQuery("question_category", questionId, categories, "question_id", "category_id");
     }
 
     @Override
     public Mono<Long> unlinkCategories(Long questionId, Set<Long> categoriesId) {
-        return databaseClient.sql(buildUnlinkCategories(questionId, categoriesId))
+        if (CollectionUtils.isEmpty(categoriesId)) {
+            return Mono.just(questionId);
+        }
+        return databaseClient.sql(buildUnlinkCategories(categoriesId))
                 .bind("questionId", questionId)
                 .fetch()
                 .all()
                 .then(Mono.just(questionId));
     }
 
-    private String buildUnlinkCategories(Long questionId, Set<Long> categoriesId) {
-        final StringBuilder sql = new StringBuilder("delete from question_category where question_id = :questionId and category_id in (");
-        categoriesId.forEach(categoryId -> sql.append(String.format("%d, ", categoryId)));
-        final int length = sql.length();
-        return sql.replace(length - 2, length, ")").toString();
+    @Override
+    public Mono<Long> unlinkCategories(Long questionId) {
+        return databaseClient.sql("delete from question_category where question_id = :id")
+                .bind("id", questionId)
+                .fetch()
+                .all()
+                .then(Mono.just(questionId));
+    }
+
+    private String buildUnlinkCategories(Set<Long> categoriesId) {
+        return DaoUtil.buildUnlinkQuery("question_category", categoriesId, "question_id", "questionId", "category_id");
     }
 
     @Override
     public Mono<Long> linkPreviousQuestions(Long questionId, Set<Long> previousQuestionId) {
+        if (CollectionUtils.isEmpty(previousQuestionId)) {
+            return Mono.just(questionId);
+        }
         return databaseClient.sql(buildLinkPreviousQuestions(questionId, previousQuestionId))
                 .fetch()
                 .all()
@@ -204,26 +202,32 @@ public class QuestionRepositoryImpl implements QuestionRepository {
     }
 
     private String buildLinkPreviousQuestions(Long questionId, Set<Long> previousQuestionsId) {
-        final StringBuilder sql = new StringBuilder("insert into question_tree(question_id, previous_question_id) values ");
-        previousQuestionsId.forEach(previousQuestionId -> sql.append(String.format("(%d, %d), ", questionId, previousQuestionId)));
-        final int length = sql.length();
-        return sql.replace(length - 2, length, "").toString();
+        return DaoUtil.buildLinkQuery("question_tree", questionId, previousQuestionsId, "question_id", "previous_question_id");
     }
 
     @Override
     public Mono<Long> unlinkPreviousQuestions(Long questionId, Set<Long> previousQuestionsId) {
-        return databaseClient.sql(buildUnlinkPreviousQuestions(questionId, previousQuestionsId))
+        if (CollectionUtils.isEmpty(previousQuestionsId)) {
+            return Mono.just(questionId);
+        }
+        return databaseClient.sql(buildUnlinkPreviousQuestions(previousQuestionsId))
                 .bind("questionId", questionId)
                 .fetch()
                 .all()
                 .then(Mono.just(questionId));
     }
 
-    private String buildUnlinkPreviousQuestions(Long questionId, Set<Long> previousQuestionsId) {
-        final StringBuilder sql = new StringBuilder("delete from question_tree where question_id = :questionId and previous_question_id in (");
-        previousQuestionsId.forEach(previousQuestionId -> sql.append(String.format("%d, ", previousQuestionId)));
-        final int length = sql.length();
-        return sql.replace(length - 2, length, ")").toString();
+    @Override
+    public Mono<Long> unlinkPreviousQuestions(Long questionId) {
+        return databaseClient.sql("delete from question_tree where question_id = :id")
+                .bind("id", questionId)
+                .fetch()
+                .all()
+                .then(Mono.just(questionId));
+    }
+
+    private String buildUnlinkPreviousQuestions(Set<Long> previousQuestionsId) {
+        return DaoUtil.buildUnlinkQuery("question_tree", previousQuestionsId, "question_id", "questionId", "previous_question_id");
     }
 
     @Override
@@ -241,6 +245,15 @@ public class QuestionRepositoryImpl implements QuestionRepository {
                 .flatMap(unused -> databaseClient.sql("delete from question").then())
                 .then();
 
+    }
+
+    @Override
+    public Mono<Void> deleteById(Long id) {
+        return databaseClient.sql("delete from question_tree where question_id = :questionId")
+                .bind("questionId", id)
+                .flatMap(result -> databaseClient.sql("delete from question_category where question_id = :id").bind("id", id).then())
+                .flatMap(unused -> databaseClient.sql("delete from question where id = :id").bind("id", id).then())
+                .then();
     }
 
     private static class QuestionCategoryRow {
