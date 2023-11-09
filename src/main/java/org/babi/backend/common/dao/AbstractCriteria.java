@@ -27,11 +27,9 @@ public abstract class AbstractCriteria implements Criteria {
     }
 
     protected void appendWhereOrAndClause(boolean whereClauseAdded, StringBuilder sql) {
-        if (whereClauseAdded) {
-            sql.append(" and ");
-        } else {
-            sql.append(" where ");
-        }
+        sql.append(
+                whereClauseAdded ? " and " : " where "
+        );
     }
 
     @Override

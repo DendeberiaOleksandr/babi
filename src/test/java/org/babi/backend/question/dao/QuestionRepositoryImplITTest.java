@@ -6,6 +6,8 @@ import org.babi.backend.common.exception.ResourceNotFoundException;
 import org.babi.backend.dao.AbstractDaoITTest;
 import org.babi.backend.image.dao.ImageRepository;
 import org.babi.backend.image.domain.Image;
+import org.babi.backend.place.domain.Place;
+import org.babi.backend.place.domain.PlaceState;
 import org.babi.backend.question.domain.Question;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,6 +16,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.r2dbc.core.DatabaseClient;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -267,6 +270,51 @@ class QuestionRepositoryImplITTest extends AbstractDaoITTest {
         List<Question> result = questionRepository.findAll().collectList().block();
         assertNotNull(result);
         assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void update_whenAllFieldsChanged_thenShouldBeUpdated() {
+        // given
+        String text = "text";
+        int x = 0;
+        int y = 0;
+
+        Image image = imageRepository.save(new Image(null, new byte[]{}, LocalDateTime.now())).block();
+        Long imageId = image.getId();
+
+        Category category = categoryRepository.save(new Category(null, "category")).block();
+        Set<Long> categoriesId = new HashSet<>();
+        categoriesId.add(category.getId());
+
+        Question question2 = questionRepository.save(new Question(null, text, imageId, image, categoriesId, List.of(category), null, null, x, y)).block();
+        Set<Long> previousQuestionId = new HashSet<>();
+        previousQuestionId.add(question2.getId());
+
+        Question question = questionRepository.save(new Question(null, text, imageId, image, categoriesId, List.of(category), previousQuestionId, null, x, y)).block();
+        question.setText("anotherText");
+        question.setX(10);
+        question.setY(10);
+
+        Image image2 = imageRepository.save(new Image(null, new byte[]{}, LocalDateTime.now())).block();
+        question.setIconId(image2.getId());
+
+        Category category2 = categoryRepository.save(new Category(null, "category2")).block();
+        question.setCategoriesId(Set.of(category.getId(), category2.getId()));
+
+        Question question3 = questionRepository.save(new Question(null, text, imageId, image, categoriesId, List.of(category), previousQuestionId, null, x, y)).block();
+        question.setPreviousQuestionsId(Set.of(question2.getId(), question3.getId()));
+
+        // when
+        Question updatedQuestion = questionRepository.update(question).block();
+
+        // then
+        assertNotNull(updatedQuestion);
+        assertNotEquals(text, updatedQuestion);
+        assertNotEquals(x,question.getX());
+        assertNotEquals(y, question.getY());
+        assertNotEquals(imageId, question.getIconId());
+        assertNotEquals(categoriesId, question.getCategoriesId());
+        assertNotEquals(previousQuestionId, question.getPreviousQuestionsId());
     }
 
 }
