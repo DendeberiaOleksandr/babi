@@ -5,7 +5,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import org.babi.backend.category.domain.Category;
-import org.babi.backend.common.dao.DaoUtil;
+import org.babi.backend.common.dao.AbstractRepository;
 import org.babi.backend.common.dao.PageableResponse;
 import org.babi.backend.common.exception.ResourceNotFoundException;
 import org.babi.backend.place.domain.Place;
@@ -13,28 +13,23 @@ import org.babi.backend.place.domain.PlaceState;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Repository;
-import org.springframework.util.CollectionUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 @Repository
-public class PlaceRepositoryImpl implements PlaceRepository {
-
-    private final DatabaseClient databaseClient;
+public class PlaceRepositoryImpl extends AbstractRepository implements PlaceRepository {
 
     @Autowired
     public PlaceRepositoryImpl(DatabaseClient databaseClient) {
-        this.databaseClient = databaseClient;
+        super(databaseClient);
     }
 
     @Override
@@ -59,15 +54,7 @@ public class PlaceRepositoryImpl implements PlaceRepository {
                 "on pc.category_id = c.id " +
                 "join place_image pi2 " +
                 "on p.id = pi2.place_id");
-        Map<String, Object> args = new HashMap<>();
-        if (placeCriteria != null) {
-            args = placeCriteria.mapCriteriaToQueryArgs(sql);
-        }
-        DatabaseClient.GenericExecuteSpec executeSpec = databaseClient.sql(sql.toString());
-
-        for (Map.Entry<String, Object> arg : args.entrySet()) {
-            executeSpec = executeSpec.bind(arg.getKey(), arg.getValue());
-        }
+        DatabaseClient.GenericExecuteSpec executeSpec = executeSpecFilledByArgs(sql, placeCriteria);
         return executeSpec
                 .map((row, rowMetadata) -> row.get(0, Long.class))
                 .first();
@@ -89,15 +76,9 @@ public class PlaceRepositoryImpl implements PlaceRepository {
                 "on pc.category_id = c.id " +
                 "join place_image pi2 " +
                 "on p.id = pi2.place_id");
-        Map<String, Object> args = new HashMap<>();
-        if (placeCriteria != null) {
-            args = placeCriteria.mapCriteriaToQueryArgs(sql);
-        }
-        DatabaseClient.GenericExecuteSpec executeSpec = databaseClient.sql(sql.toString());
 
-        for (Map.Entry<String, Object> arg : args.entrySet()) {
-            executeSpec = executeSpec.bind(arg.getKey(), arg.getValue());
-        }
+        DatabaseClient.GenericExecuteSpec executeSpec = executeSpecFilledByArgs(sql, placeCriteria);
+
         return executeSpec
                 .map((row, rowMetadata) -> new PlaceCategoryImageRow(
                         row.get("id", Long.class),
@@ -176,101 +157,46 @@ public class PlaceRepositoryImpl implements PlaceRepository {
 
     @Override
     public Mono<Long> linkCategories(Long placeId, Set<Long> categoriesId) {
-        if (CollectionUtils.isEmpty(categoriesId)) {
-            return Mono.just(placeId);
-        }
-        String sql = buildLinkCategoriesSQL(placeId, categoriesId);
-        return databaseClient.sql(sql)
-                .fetch()
-                .all()
-                .then(Mono.just(placeId));
-    }
-
-    private String buildLinkCategoriesSQL(Long placeId, Set<Long> categoriesId) {
-        return DaoUtil.buildLinkQuery("place_category", placeId, categoriesId, "place_id", "category_id");
+        return linkNestedEntities(PlaceCategoryTable.TABLE, placeId, categoriesId, PlaceCategoryTable.PLACE_ID, PlaceCategoryTable.CATEGORY_ID);
     }
 
     @Override
     public Mono<Long> unlinkCategories(Long placeId, Set<Long> categoriesId) {
-        if (CollectionUtils.isEmpty(categoriesId)) {
-            return Mono.just(placeId);
-        }
-        return databaseClient.sql(buildUnlinkCategories(categoriesId))
-                .bind("placeId", placeId)
-                .fetch()
-                .all()
-                .then(Mono.just(placeId));
+        return unlinkNestedEntities(PlaceCategoryTable.TABLE, placeId, categoriesId, PlaceCategoryTable.PLACE_ID, PlaceCategoryTable.CATEGORY_ID);
     }
 
     @Override
     public Mono<Long> unlinkCategories(Long placeId) {
-        return databaseClient.sql("delete from place_category where place_id = :id")
-                .bind("id", placeId)
-                .fetch()
-                .all()
-                .then(Mono.just(placeId));
-    }
-
-    private String buildUnlinkCategories(Set<Long> categoriesId) {
-        return DaoUtil.buildUnlinkQuery("place_category", categoriesId, "place_id", "placeId", "category_id");
+        return unlinkNestedEntities(PlaceCategoryTable.TABLE, PlaceCategoryTable.PLACE_ID, placeId);
     }
 
     @Override
     public Mono<Long> linkImages(Long placeId, Set<Long> imagesId) {
-        if (CollectionUtils.isEmpty(imagesId)) {
-            return Mono.just(placeId);
-        }
-        String sql = buildLinkImagesSQL(placeId, imagesId);
-        return databaseClient.sql(sql)
-                .fetch()
-                .all()
-                .then(Mono.just(placeId));
-    }
-
-    private String buildLinkImagesSQL(Long placeId, Set<Long> imagesId) {
-        return DaoUtil.buildLinkQuery("place_image", placeId, imagesId, "place_id", "image_id");
+        return linkNestedEntities(PlaceImageTable.TABLE, placeId, imagesId, PlaceImageTable.PLACE_ID, PlaceImageTable.IMAGE_ID);
     }
 
     @Override
     public Mono<Long> unlinkImages(Long placeId, Set<Long> imagesId) {
-        if (CollectionUtils.isEmpty(imagesId)) {
-            return Mono.just(placeId);
-        }
-        return databaseClient.sql(buildUnlinkImagesSQL(imagesId))
-                .bind("placeId", placeId)
-                .fetch()
-                .all()
-                .then(Mono.just(placeId));
+        return unlinkNestedEntities(PlaceImageTable.TABLE, placeId, imagesId, PlaceImageTable.PLACE_ID, PlaceImageTable.IMAGE_ID);
     }
 
     @Override
     public Mono<Long> unlinkImages(Long placeId) {
-        return databaseClient.sql("delete from place_image where place_id = :id")
-                .bind("id", placeId)
-                .fetch()
-                .all()
-                .then(Mono.just(placeId));
+        return unlinkNestedEntities(PlaceImageTable.TABLE, PlaceImageTable.PLACE_ID, placeId);
     }
 
     @Override
     public Mono<Void> deleteAll() {
-        return databaseClient.sql("delete from place_category")
-                .flatMap(result -> databaseClient.sql("delete from place_image").then())
-                .flatMap(unused -> databaseClient.sql("delete from place").then())
-                .then();
+        return deleteAll(List.of(PlaceCategoryTable.TABLE, PlaceImageTable.TABLE, PlaceTable.TABLE));
     }
 
     @Override
     public Mono<Void> deleteById(Long id) {
-        return databaseClient.sql("delete from place_category where place_id = :placeId")
-                .bind("placeId", id)
-                .flatMap(result -> databaseClient.sql("delete from place_image where place_id = :placeId").bind("placeId", id).then())
-                .flatMap(unused -> databaseClient.sql("delete from place where id = :id").bind("id", id).then())
-                .then();
-    }
-
-    private String buildUnlinkImagesSQL(Set<Long> imagesId) {
-        return DaoUtil.buildUnlinkQuery("place_image", imagesId, "place_id", "placeId", "image_id");
+        return deleteById(List.of(
+                new DeleteByIdParam(PlaceImageTable.TABLE, PlaceImageTable.PLACE_ID, id),
+                new DeleteByIdParam(PlaceCategoryTable.TABLE, PlaceCategoryTable.PLACE_ID, id),
+                new DeleteByIdParam(PlaceTable.TABLE, PlaceTable.ID, id)
+        ));
     }
 
     @AllArgsConstructor
@@ -288,5 +214,22 @@ public class PlaceRepositoryImpl implements PlaceRepository {
         private String categoryName;
         private Long imageId;
         private PlaceState placeState;
+    }
+
+    private static class PlaceImageTable {
+        private static final String TABLE = "place_image";
+        private static final String PLACE_ID = "place_id";
+        private static final String IMAGE_ID = "image_id";
+    }
+
+    private static class PlaceCategoryTable {
+        private static final String TABLE = "place_category";
+        private static final String PLACE_ID = "place_id";
+        private static final String CATEGORY_ID = "category_id";
+    }
+
+    private static class PlaceTable {
+        private static final String TABLE = "place";
+        private static final String ID = "id";
     }
 }
