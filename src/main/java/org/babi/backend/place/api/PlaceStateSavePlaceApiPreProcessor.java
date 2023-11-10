@@ -10,7 +10,7 @@ public class PlaceStateSavePlaceApiPreProcessor implements SavePlaceApiPreProces
     @Override
     public void preProcess(Place place, Authentication authentication) {
         PlaceState placeState = authentication.getAuthorities().stream()
-                .anyMatch(grantedAuthority -> grantedAuthority.getAuthority().equals("ADMIN")) ? PlaceState.APPROVED : PlaceState.REVIEW;
+                .anyMatch(grantedAuthority -> "ADMIN".equals(grantedAuthority.getAuthority())) ? PlaceState.APPROVED : PlaceState.REVIEW;
         place.setPlaceState(placeState);
     }
 }
