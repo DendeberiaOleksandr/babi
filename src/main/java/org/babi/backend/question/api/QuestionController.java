@@ -19,7 +19,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
-import java.util.Set;
 
 @RestController
 @RequestMapping("/api/v1/questions")
@@ -64,15 +63,9 @@ public class QuestionController {
     }
 
     @Secured("hasRole('ADMIN')")
-    @PutMapping("/{questionId}/previousQuestions")
-    public Mono<ResponseEntity<?>> addPreviousQuestion(@PathVariable("questionId") Long questionId, @RequestBody Set<Long> previousQuestionsId) {
-        return questionService.addPreviousQuestions(questionId, previousQuestionsId).map(ResponseEntity::ok);
-    }
-
-    @Secured("hasRole('ADMIN')")
-    @DeleteMapping("/{questionId}/previousQuestions/{previousQuestionId}")
-    public Mono<ResponseEntity<?>> removePreviousQuestion(@PathVariable("questionId") Long questionId, @PathVariable("previousQuestionId") Set<Long> previousQuestionsId) {
-        return questionService.addPreviousQuestions(questionId, previousQuestionsId).map(ResponseEntity::ok);
+    @DeleteMapping("/{id}")
+    public Mono<Void> delete(@PathVariable Long id) {
+        return questionService.deleteById(id);
     }
 
 }

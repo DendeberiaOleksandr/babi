@@ -14,6 +14,5 @@ public interface QuestionService {
     Mono<Long> save(Question question);
     Mono<Long> update(Question question);
     Flux<Long> updateAll(List<Question> questions);
-    Mono<Long> addPreviousQuestions(Long questionId, Set<Long> previousQuestionsId);
-    Mono<Long> removePreviousQuestions(Long questionId, Set<Long> previousQuestionsId);
+    Mono<Void> deleteById(Long id);
 }

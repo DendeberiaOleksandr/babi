@@ -1,6 +1,10 @@
 package org.babi.backend.question.dao;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
 import org.babi.backend.category.domain.Category;
+import org.babi.backend.common.dao.AbstractRepository;
+import org.babi.backend.common.exception.ResourceNotFoundException;
 import org.babi.backend.question.domain.Question;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.r2dbc.core.DatabaseClient;
@@ -9,25 +13,20 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 @Repository
-public class QuestionRepositoryImpl implements QuestionRepository {
-
-    private final DatabaseClient databaseClient;
+public class QuestionRepositoryImpl extends AbstractRepository implements QuestionRepository {
 
     @Autowired
     public QuestionRepositoryImpl(DatabaseClient databaseClient) {
-        this.databaseClient = databaseClient;
+        super(databaseClient);
     }
-
 
     @Override
     public Flux<Question> findAll() {
@@ -36,10 +35,7 @@ public class QuestionRepositoryImpl implements QuestionRepository {
 
     @Override
     public Flux<Long> findPreviousQuestionsId(Long questionId) {
-        return databaseClient.sql("select previous_question_id from question_tree where question_id = :questionId")
-                .bind("questionId", questionId)
-                .map((row, rowMetadata) -> row.get("previous_question_id", Long.class))
-                .all();
+        return findAllNestedIds(QuestionTreeTable.TABLE, QuestionTreeTable.QUESTION_ID, questionId, QuestionTreeTable.PREVIOUS_QUESTION_ID);
     }
 
     private Flux<Question> findAll(QuestionCriteria questionCriteria) {
@@ -51,12 +47,8 @@ public class QuestionRepositoryImpl implements QuestionRepository {
                 "on qc.category_id = c.id " +
                 "left join question_tree qt " +
                 "on q.id = qt.question_id");
-        Map<String, Object> args = mapCriteriaToQuery(questionCriteria, sql);
-        DatabaseClient.GenericExecuteSpec executeSpec = databaseClient.sql(sql.toString());
 
-        for (Map.Entry<String, Object> arg : args.entrySet()) {
-            executeSpec = executeSpec.bind(arg.getKey(), arg.getValue());
-        }
+        DatabaseClient.GenericExecuteSpec executeSpec = executeSpecFilledByArgs(sql, questionCriteria);
 
         return executeSpec
                 .map((row, rowMetadata) -> new QuestionCategoryRow(
@@ -106,36 +98,9 @@ public class QuestionRepositoryImpl implements QuestionRepository {
                 }).flatMapMany(questions -> Flux.fromStream(questions.stream()));
     }
 
-    private Map<String, Object> mapCriteriaToQuery(QuestionCriteria questionCriteria, StringBuilder sql) {
-        Map<String, Object> args = new HashMap<>();
-        if (questionCriteria != null) {
-            boolean whereClauseAdded = false;
-            Long questionId = questionCriteria.getQuestionId();
-            if (questionId != null) {
-                appendWhereOrAndClause(whereClauseAdded, sql);
-                whereClauseAdded = true;
-                sql.append("q.id = :id");
-                args.put("id", questionId);
-            }
-
-        }
-        return args;
-    }
-
-    private void appendWhereOrAndClause(boolean whereClauseAdded, StringBuilder sql) {
-        if (whereClauseAdded) {
-            sql.append(" and ");
-        } else {
-            sql.append(" where ");
-        }
-    }
-
     @Override
     public Mono<Question> findById(Long id) {
-        return findAll(QuestionCriteria.builder()
-                .questionId(id)
-                .build())
-                .single();
+        return findAll(new QuestionCriteria(id)).switchIfEmpty(Mono.error(new ResourceNotFoundException(Question.class, "id", id))).single();
     }
 
     @Override
@@ -146,6 +111,8 @@ public class QuestionRepositoryImpl implements QuestionRepository {
                 .filter((statement, executeFunction) -> statement.returnGeneratedValues("id").execute())
                 .fetch().first()
                 .doOnNext(result -> question.setId(Long.parseLong(result.get("id").toString())))
+                .flatMap(result -> linkCategories(question.getId(), question.getCategoriesId()))
+                .flatMap(questionId -> linkPreviousQuestions(questionId, question.getPreviousQuestionsId()))
                 .thenReturn(question);
 
     }
@@ -160,89 +127,68 @@ public class QuestionRepositoryImpl implements QuestionRepository {
                 .bind("y", question.getY())
                 .fetch()
                 .all()
-                .then(Mono.just(question));
+                .then(Mono.just(question))
+                .flatMap(q -> unlinkCategories(q.getId()))
+                .flatMap(questionId -> linkCategories(questionId, question.getCategoriesId()))
+                .flatMap(this::unlinkPreviousQuestions)
+                .flatMap(questionId -> linkPreviousQuestions(questionId, question.getPreviousQuestionsId()))
+                .thenReturn(question);
     }
 
     @Override
-    public Mono<Long> linkCategories(Long questionId, Set<Long> categories) {
-        String sql = buildLinkCategoriesSQL(questionId, categories);
-        return databaseClient.sql(sql)
-                .fetch()
-                .all()
-                .then(Mono.just(questionId));
-    }
-
-    private String buildLinkCategoriesSQL(Long questionId, Set<Long> categories) {
-        final StringBuilder sql = new StringBuilder("insert into question_category(question_id, category_id) values ");
-        categories.forEach(categoryId -> sql.append(String.format("(%d, %d), ", questionId, categoryId)));
-        final int length = sql.length();
-        return sql.replace(length - 2, length, "").toString();
+    public Mono<Long> linkCategories(Long questionId, Set<Long> categoriesId) {
+        return linkNestedEntities("question_category", questionId, categoriesId, "question_id", "category_id", "questionId", "categoryId");
     }
 
     @Override
     public Mono<Long> unlinkCategories(Long questionId, Set<Long> categoriesId) {
-        return databaseClient.sql(buildUnlinkCategories(questionId, categoriesId))
-                .bind("questionId", questionId)
-                .fetch()
-                .all()
-                .then(Mono.just(questionId));
+        return unlinkNestedEntities("question_category", questionId, categoriesId, "question_id", "category_id");
     }
 
-    private String buildUnlinkCategories(Long questionId, Set<Long> categoriesId) {
-        final StringBuilder sql = new StringBuilder("delete from question_category where question_id = :questionId and category_id in (");
-        categoriesId.forEach(categoryId -> sql.append(String.format("%d, ", categoryId)));
-        final int length = sql.length();
-        return sql.replace(length - 2, length, ")").toString();
+    @Override
+    public Mono<Long> unlinkCategories(Long questionId) {
+        return unlinkNestedEntities(QuestionCategoryTable.TABLE, QuestionCategoryTable.QUESTION_ID, questionId);
     }
 
     @Override
     public Mono<Long> linkPreviousQuestions(Long questionId, Set<Long> previousQuestionId) {
-        return databaseClient.sql(buildLinkPreviousQuestions(questionId, previousQuestionId))
-                .fetch()
-                .all()
-                .then(Mono.just(questionId));
-    }
-
-    private String buildLinkPreviousQuestions(Long questionId, Set<Long> previousQuestionsId) {
-        final StringBuilder sql = new StringBuilder("insert into question_tree(question_id, previous_question_id) values ");
-        previousQuestionsId.forEach(previousQuestionId -> sql.append(String.format("(%d, %d), ", questionId, previousQuestionId)));
-        final int length = sql.length();
-        return sql.replace(length - 2, length, "").toString();
+        return linkNestedEntities(QuestionTreeTable.TABLE, questionId, previousQuestionId, QuestionTreeTable.QUESTION_ID, QuestionTreeTable.PREVIOUS_QUESTION_ID);
     }
 
     @Override
     public Mono<Long> unlinkPreviousQuestions(Long questionId, Set<Long> previousQuestionsId) {
-        return databaseClient.sql(buildUnlinkPreviousQuestions(questionId, previousQuestionsId))
-                .bind("questionId", questionId)
-                .fetch()
-                .all()
-                .then(Mono.just(questionId));
+        return unlinkNestedEntities(QuestionTreeTable.TABLE, questionId, previousQuestionsId, QuestionTreeTable.QUESTION_ID, QuestionTreeTable.PREVIOUS_QUESTION_ID);
     }
 
-    private String buildUnlinkPreviousQuestions(Long questionId, Set<Long> previousQuestionsId) {
-        final StringBuilder sql = new StringBuilder("delete from question_tree where question_id = :questionId and previous_question_id in (");
-        previousQuestionsId.forEach(previousQuestionId -> sql.append(String.format("%d, ", previousQuestionId)));
-        final int length = sql.length();
-        return sql.replace(length - 2, length, ")").toString();
+    @Override
+    public Mono<Long> unlinkPreviousQuestions(Long questionId) {
+        return unlinkNestedEntities(QuestionTreeTable.TABLE, QuestionTreeTable.QUESTION_ID, questionId);
     }
 
     @Override
     public Flux<Long> getQuestionCategoriesId(Long questionId) {
-        return databaseClient.sql("select category_id from question_category where question_id = :questionId")
-                .bind("questionId", questionId)
-                .map((row, rowMetadata) -> row.get("category_id", Long.class))
-                .all();
+        return findAllNestedIds(QuestionCategoryTable.TABLE, QuestionCategoryTable.QUESTION_ID, questionId, QuestionCategoryTable.CATEGORY_ID);
     }
 
     @Override
     public Mono<Void> deleteAll() {
-        return databaseClient.sql("delete from question_tree")
-                .flatMap(result -> databaseClient.sql("delete from question_category").then())
-                .flatMap(unused -> databaseClient.sql("delete from question").then())
-                .then();
+        return deleteAll(List.of(
+                QuestionCategoryTable.TABLE, QuestionTreeTable.TABLE, QuestionTable.TABLE
+        ));
 
     }
 
+    @Override
+    public Mono<Void> deleteById(Long id) {
+        return deleteById(List.of(
+                new DeleteByIdParam(QuestionCategoryTable.TABLE, QuestionCategoryTable.QUESTION_ID, id),
+                new DeleteByIdParam(QuestionTreeTable.TABLE, QuestionTreeTable.QUESTION_ID, id),
+                new DeleteByIdParam(QuestionTable.TABLE, QuestionTable.ID, id)
+        ));
+    }
+
+    @AllArgsConstructor
+    @Data
     private static class QuestionCategoryRow {
         private Long id;
         private String text;
@@ -252,96 +198,23 @@ public class QuestionRepositoryImpl implements QuestionRepository {
         private Long previousQuestionId;
         private int x;
         private int y;
+    }
 
-        public QuestionCategoryRow(Long id, String text, Long iconId, Long categoryId,
-                                   String categoryName, Long previousQuestionId, int x, int y) {
-            this.id = id;
-            this.text = text;
-            this.iconId = iconId;
-            this.categoryId = categoryId;
-            this.categoryName = categoryName;
-            this.previousQuestionId = previousQuestionId;
-            this.x = x;
-            this.y = y;
-        }
+    private static class QuestionCategoryTable {
+        private static final String TABLE = "question_category";
+        private static final String QUESTION_ID = "question_id";
+        private static final String CATEGORY_ID = "category_id";
+    }
 
-        public Long getId() {
-            return id;
-        }
+    private static class QuestionTreeTable {
+        private static final String TABLE = "question_tree";
+        private static final String QUESTION_ID = "question_id";
+        private static final String PREVIOUS_QUESTION_ID = "previous_question_id";
+    }
 
-        public void setId(Long id) {
-            this.id = id;
-        }
-
-        public String getText() {
-            return text;
-        }
-
-        public void setText(String text) {
-            this.text = text;
-        }
-
-        public Long getIconId() {
-            return iconId;
-        }
-
-        public void setIconId(Long iconId) {
-            this.iconId = iconId;
-        }
-
-        public Long getCategoryId() {
-            return categoryId;
-        }
-
-        public void setCategoryId(Long categoryId) {
-            this.categoryId = categoryId;
-        }
-
-        public String getCategoryName() {
-            return categoryName;
-        }
-
-        public void setCategoryName(String categoryName) {
-            this.categoryName = categoryName;
-        }
-
-        public Long getPreviousQuestionId() {
-            return previousQuestionId;
-        }
-
-        public int getX() {
-            return x;
-        }
-
-        public void setX(int x) {
-            this.x = x;
-        }
-
-        public int getY() {
-            return y;
-        }
-
-        public void setY(int y) {
-            this.y = y;
-        }
-
-        public void setPreviousQuestionId(Long previousQuestionId) {
-            this.previousQuestionId = previousQuestionId;
-        }
-
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            QuestionCategoryRow that = (QuestionCategoryRow) o;
-            return x == that.x && y == that.y && Objects.equals(id, that.id) && Objects.equals(text, that.text) && Objects.equals(iconId, that.iconId) && Objects.equals(categoryId, that.categoryId) && Objects.equals(categoryName, that.categoryName) && Objects.equals(previousQuestionId, that.previousQuestionId);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(id, text, iconId, categoryId, categoryName, previousQuestionId, x, y);
-        }
+    private static class QuestionTable {
+        private static final String TABLE = "question";
+        private static final String ID = "id";
     }
 
 }

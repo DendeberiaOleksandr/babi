@@ -16,9 +16,12 @@ public interface QuestionRepository {
     Mono<Question> update(Question question);
     Mono<Long> linkCategories(Long questionId, Set<Long> categoriesId);
     Mono<Long> unlinkCategories(Long questionId, Set<Long> categoriesId);
+    Mono<Long> unlinkCategories(Long questionId);
     Mono<Long> linkPreviousQuestions(Long questionId, Set<Long> previousQuestionsId);
     Mono<Long> unlinkPreviousQuestions(Long questionId, Set<Long> previousQuestionsId);
+    Mono<Long> unlinkPreviousQuestions(Long questionId);
     Flux<Long> getQuestionCategoriesId(Long questionId);
     Mono<Void> deleteAll();
+    Mono<Void> deleteById(Long id);
 
 }
