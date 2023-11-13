@@ -14,4 +14,5 @@ public interface QuestionService {
     Mono<Long> save(Question question);
     Mono<Long> update(Question question);
     Flux<Long> updateAll(List<Question> questions);
+    Mono<Void> deleteById(Long id);
 }

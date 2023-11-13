@@ -31,8 +31,7 @@ public class Place {
     private List<Category> categories;
     private LocalDateTime addingDate;
     private String pageLink;
-    private double longitude;
-    private double latitude;
     private PlaceState placeState;
+    private Address address;
 
 }

@@ -55,5 +55,10 @@ public class QuestionServiceImpl implements QuestionService {
                 .flatMap(this::update);
     }
 
+    @Override
+    public Mono<Void> deleteById(Long id) {
+        return questionRepository.deleteById(id);
+    }
+
 
 }

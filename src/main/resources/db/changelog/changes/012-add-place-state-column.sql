@@ -1,1 +1,1 @@
-alter table place add column place_state varchar(50) not null default 'HIDDEN';
+alter table place add column if not exists place_state varchar(50) not null default 'HIDDEN';

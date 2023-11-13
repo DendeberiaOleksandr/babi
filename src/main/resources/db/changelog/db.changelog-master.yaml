@@ -35,3 +35,6 @@ databaseChangeLog:
   - include:
       file: changes/012-add-place-state-column.sql
       relativeToChangelogFile: true
+  - include:
+      file: changes/013-add-address-components-column-to-place-table.sql
+      relativeToChangelogFile: true

@@ -8,6 +8,7 @@ import org.babi.backend.category.domain.Category;
 import org.babi.backend.common.dao.AbstractRepository;
 import org.babi.backend.common.dao.PageableResponse;
 import org.babi.backend.common.exception.ResourceNotFoundException;
+import org.babi.backend.place.domain.Address;
 import org.babi.backend.place.domain.Place;
 import org.babi.backend.place.domain.PlaceState;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,6 +68,7 @@ public class PlaceRepositoryImpl extends AbstractRepository implements PlaceRepo
 
     private Flux<Place> findAll(PlaceCriteria placeCriteria) {
         final StringBuilder sql = new StringBuilder("select p.id, p.name, p.adding_date, p.page_link, p.longitude, p.latitude, p.place_state, " +
+                "p.street_number, p.route, p.locality, p.administrative_area_level_2, p.administrative_area_level_1, p.country, p.postal_code, " +
                 "c.id as category_id, c.name as category_name, " +
                 "pi2.image_id " +
                 "from place p " +
@@ -85,12 +87,21 @@ public class PlaceRepositoryImpl extends AbstractRepository implements PlaceRepo
                         row.get("name", String.class),
                         row.get("adding_date", LocalDateTime.class),
                         row.get("page_link", String.class),
-                        Optional.ofNullable(row.get("longitude", Double.class)).orElse(0.0),
-                        Optional.ofNullable(row.get("latitude", Double.class)).orElse(0.0),
                         row.get("category_id", Long.class),
                         row.get("category_name", String.class),
                         row.get("image_id", Long.class),
-                        PlaceState.valueOf(row.get("place_state", String.class))
+                        PlaceState.valueOf(row.get("place_state", String.class)),
+                        new Address(
+                                row.get("street_number", String.class),
+                                row.get("route", String.class),
+                                row.get("locality", String.class),
+                                row.get("administrative_area_level_2", String.class),
+                                row.get("administrative_area_level_1", String.class),
+                                row.get("country", String.class),
+                                row.get("postal_code", String.class),
+                                Optional.ofNullable(row.get("longitude", Double.class)).orElse(0.0),
+                                Optional.ofNullable(row.get("latitude", Double.class)).orElse(0.0)
+                        )
                 ))
                 .all()
                 .collectList()
@@ -104,8 +115,7 @@ public class PlaceRepositoryImpl extends AbstractRepository implements PlaceRepo
                         place.setId(placeRow.getId());
                         place.setName(placeRow.getName());
                         place.setAddingDate(placeRow.getAddingDate());
-                        place.setLatitude(placeRow.getLatitude());
-                        place.setLongitude(placeRow.getLongitude());
+                        place.setAddress(placeRow.getAddress());
                         place.setPageLink(placeRow.getPageLink());
                         Long categoryId = placeRow.getCategoryId();
                         categories.add(new Category(categoryId, placeRow.getCategoryName()));
@@ -121,13 +131,21 @@ public class PlaceRepositoryImpl extends AbstractRepository implements PlaceRepo
 
     @Override
     public Mono<Place> save(Place place) {
-        return databaseClient.sql("insert into place(name, adding_date, page_link, longitude, latitude, place_state) values (:name, :addingDate, :pageLink, :longitude, :latitude, :placeState)")
+        Optional<Address> address = Optional.ofNullable(place.getAddress());
+        DatabaseClient.GenericExecuteSpec executeSpec = databaseClient.sql("insert into place(name, adding_date, page_link, longitude, latitude," +
+                        "place_state, street_number, route, locality, administrative_area_level_2," +
+                        "administrative_area_level_1, country, postal_code) " +
+                        "values (:name, :addingDate, :pageLink, :longitude, :latitude, :placeState," +
+                        ":streetNumber, :route, :locality, :administrativeAreaLevel2, :administrativeAreaLevel1," +
+                        ":country, :postalCode)")
                 .bind("name", place.getName())
-                .bind("addingDate", place.getAddingDate())
+                .bind("addingDate", Optional.ofNullable(place.getAddingDate()).orElse(LocalDateTime.now()))
                 .bind("pageLink", place.getPageLink())
-                .bind("longitude", place.getLongitude())
-                .bind("latitude", place.getLatitude())
-                .bind("placeState", place.getPlaceState().name())
+                .bind("longitude", address.map(Address::getLongitude).orElse(0.0))
+                .bind("latitude", address.map(Address::getLatitude).orElse(0.0))
+                .bind("placeState", place.getPlaceState().name());
+
+                return bindNullableParametersForInsertQuery(executeSpec, place)
                 .filter((statement, executeFunction) -> statement.returnGeneratedValues("id").execute())
                 .fetch().first()
                 .doOnNext(result -> place.setId(Long.parseLong(result.get("id").toString())))
@@ -136,16 +154,61 @@ public class PlaceRepositoryImpl extends AbstractRepository implements PlaceRepo
                 .thenReturn(place);
     }
 
+    private DatabaseClient.GenericExecuteSpec bindNullableParametersForInsertQuery(DatabaseClient.GenericExecuteSpec executeSpec, Place place) {
+        Address address = place.getAddress();
+        if (address == null) {
+            return bindNullForAddressComponents(executeSpec);
+        } else {
+            String streetNumber = address.getStreetNumber();
+            executeSpec = streetNumber == null ? executeSpec.bindNull("streetNumber", String.class) : executeSpec.bind("streetNumber", streetNumber);
+
+            String route = address.getRoute();
+            executeSpec = route == null ? executeSpec.bindNull("route", String.class) : executeSpec.bind("route", route);
+
+            String locality = address.getLocality();
+            executeSpec = locality == null ? executeSpec.bindNull("locality", String.class) : executeSpec.bind("locality", locality);
+
+            String administrativeAreaLevel2 = address.getAdministrativeAreaLevel2();
+            executeSpec = administrativeAreaLevel2 == null ? executeSpec.bindNull("administrativeAreaLevel2", String.class) : executeSpec.bind("administrativeAreaLevel2", administrativeAreaLevel2);
+
+            String administrativeAreaLevel1 = address.getAdministrativeAreaLevel1();
+            executeSpec = administrativeAreaLevel1 == null ? executeSpec.bindNull("administrativeAreaLevel1", String.class) : executeSpec.bind("administrativeAreaLevel1", administrativeAreaLevel1);
+
+            String country = address.getCountry();
+            executeSpec = country == null ? executeSpec.bindNull("country", String.class) : executeSpec.bind("country", country);
+
+            String postalCode = address.getPostalCode();
+            return country == null ? executeSpec.bindNull("postalCode", String.class) : executeSpec.bind("postalCode", postalCode);
+        }
+    }
+
+    private DatabaseClient.GenericExecuteSpec bindNullForAddressComponents(DatabaseClient.GenericExecuteSpec executeSpec) {
+        return executeSpec
+                .bindNull("streetNumber", String.class)
+                .bindNull("route", String.class)
+                .bindNull("locality", String.class)
+                .bindNull("administrative_area_level_2", String.class)
+                .bindNull("administrative_area_level_1", String.class)
+                .bindNull("country", String.class)
+                .bindNull("postal_code", String.class);
+    }
+
     @Override
     public Mono<Place> update(Place place) {
-        return databaseClient.sql("update place set name = :name, page_link = :pageLink, longitude = :longitude," +
-                "latitude = :latitude, place_state = :placeState where id = :id")
+        Optional<Address> address = Optional.ofNullable(place.getAddress());
+        DatabaseClient.GenericExecuteSpec executeSpec = databaseClient.sql("update place set name = :name, page_link = :pageLink, longitude = :longitude," +
+                        "latitude = :latitude, place_state = :placeState, street_number = :streetNumber," +
+                        "route = :route, locality = :locality, administrative_area_level_2 = :administrativeAreaLevel2," +
+                        "administrative_area_level_1 = :administrativeAreaLevel1, country = :country," +
+                        "postal_code = :postalCode where id = :id")
                 .bind("name", place.getName())
                 .bind("pageLink", place.getPageLink())
-                .bind("longitude", place.getLongitude())
-                .bind("latitude", place.getLatitude())
+                .bind("longitude", address.map(Address::getLongitude).orElse(0.0))
+                .bind("latitude", address.map(Address::getLatitude).orElse(0.0))
                 .bind("placeState", place.getPlaceState().name())
-                .bind("id", place.getId())
+                .bind("id", place.getId());
+
+        return bindNullableParametersForInsertQuery(executeSpec, place)
                 .fetch()
                 .all()
                 .flatMap(result -> unlinkCategories(place.getId()))
@@ -208,12 +271,11 @@ public class PlaceRepositoryImpl extends AbstractRepository implements PlaceRepo
         private String name;
         private LocalDateTime addingDate;
         private String pageLink;
-        private double longitude;
-        private double latitude;
         private Long categoryId;
         private String categoryName;
         private Long imageId;
         private PlaceState placeState;
+        private Address address;
     }
 
     private static class PlaceImageTable {

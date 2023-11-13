@@ -6,6 +6,7 @@ import org.babi.backend.common.exception.ResourceNotFoundException;
 import org.babi.backend.dao.AbstractDaoITTest;
 import org.babi.backend.image.dao.ImageRepository;
 import org.babi.backend.image.domain.Image;
+import org.babi.backend.place.domain.Address;
 import org.babi.backend.place.domain.Place;
 import org.babi.backend.place.domain.PlaceState;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,7 +47,11 @@ class PlaceRepositoryImplTest extends AbstractDaoITTest {
         // given
 
         // when
-        assertThrows(DataIntegrityViolationException.class, () -> placeRepository.save(new Place(null, "name", Set.of(1L), Set.of(1L), null, LocalDateTime.now(), "link", 0.0, 0.0, PlaceState.APPROVED)).block());
+        assertThrows(DataIntegrityViolationException.class,
+                () -> placeRepository.save(new Place(null, "name", Set.of(1L), Set.of(1L),
+                        null, LocalDateTime.now(), "link", PlaceState.APPROVED,
+                        new Address("street", "street", "locality", "adminLevel2",
+                                "adminLevel1", "country", "postalCode", 0.0, 0.0))).block());
 
         // then
     }
@@ -58,7 +63,9 @@ class PlaceRepositoryImplTest extends AbstractDaoITTest {
         Category category = categoryRepository.save(new Category(null, "name")).block();
 
         // when
-        Place place = placeRepository.save(new Place(null, "name", Set.of(image.getId()), Set.of(category.getId()), null, LocalDateTime.now(), "link", 0.0, 0.0, PlaceState.APPROVED)).block();
+        Place place = placeRepository.save(new Place(null, "name", Set.of(image.getId()), Set.of(category.getId()), null, LocalDateTime.now(), "link", PlaceState.APPROVED,
+                new Address("street", "street", "locality", "adminLevel2",
+                        "adminLevel1", "country", "postalCode", 0.0, 0.0))).block();
 
         // then
         assertNotNull(place);
@@ -82,7 +89,9 @@ class PlaceRepositoryImplTest extends AbstractDaoITTest {
         // given
         Image image = imageRepository.save(new Image(null, new byte[]{}, LocalDateTime.now())).block();
         Category category = categoryRepository.save(new Category(null, "name")).block();
-        placeRepository.save(new Place(null, "name", Set.of(image.getId()), Set.of(category.getId()), null, LocalDateTime.now(), "link", 0.0, 0.0, PlaceState.APPROVED)).block();
+        placeRepository.save(new Place(null, "name", Set.of(image.getId()), Set.of(category.getId()), null, LocalDateTime.now(), "link", PlaceState.APPROVED,
+                new Address("street", "street", "locality", "adminLevel2",
+                        "adminLevel1", "country", "postalCode", 0.0, 0.0))).block();
 
         // when
         List<Place> result = placeRepository.findAll().collectList().block();
@@ -107,7 +116,9 @@ class PlaceRepositoryImplTest extends AbstractDaoITTest {
         // given
         Image image = imageRepository.save(new Image(null, new byte[]{}, LocalDateTime.now())).block();
         Category category = categoryRepository.save(new Category(null, "name")).block();
-        Place place = placeRepository.save(new Place(null, "name", Set.of(image.getId()), Set.of(category.getId()), null, LocalDateTime.now(), "link", 0.0, 0.0, PlaceState.APPROVED)).block();
+        Place place = placeRepository.save(new Place(null, "name", Set.of(image.getId()), Set.of(category.getId()), null, LocalDateTime.now(), "link", PlaceState.APPROVED,
+                new Address("street", "street", "locality", "adminLevel2",
+                        "adminLevel1", "country", "postalCode", 0.0, 0.0))).block();
 
         // when
         Place result = placeRepository.findById(place.getId()).block();
@@ -121,7 +132,9 @@ class PlaceRepositoryImplTest extends AbstractDaoITTest {
         // given
         Image image = imageRepository.save(new Image(null, new byte[]{}, LocalDateTime.now())).block();
         Category category = categoryRepository.save(new Category(null, "name")).block();
-        Place place = placeRepository.save(new Place(null, "name", Set.of(image.getId()), Set.of(category.getId()), null, LocalDateTime.now(), "link", 0.0, 0.0, PlaceState.APPROVED)).block();
+        Place place = placeRepository.save(new Place(null, "name", Set.of(image.getId()), Set.of(category.getId()), null, LocalDateTime.now(), "link", PlaceState.APPROVED,
+                new Address("street", "street", "locality", "adminLevel2",
+                        "adminLevel1", "country", "postalCode", 0.0, 0.0))).block();
         PlaceCriteria placeCriteria = new PlaceCriteria();
         placeCriteria.setCategoryId(category.getId() + 1);
 
@@ -138,7 +151,9 @@ class PlaceRepositoryImplTest extends AbstractDaoITTest {
         // given
         Image image = imageRepository.save(new Image(null, new byte[]{}, LocalDateTime.now())).block();
         Category category = categoryRepository.save(new Category(null, "name")).block();
-        placeRepository.save(new Place(null, "name", Set.of(image.getId()), Set.of(category.getId()), null, LocalDateTime.now(), "link", 0.0, 0.0, PlaceState.APPROVED)).block();
+        placeRepository.save(new Place(null, "name", Set.of(image.getId()), Set.of(category.getId()), null, LocalDateTime.now(), "link", PlaceState.APPROVED,
+                new Address("street", "street", "locality", "adminLevel2",
+                        "adminLevel1", "country", "postalCode", 0.0, 0.0))).block();
         PlaceCriteria placeCriteria = new PlaceCriteria();
         placeCriteria.setCategoryId(category.getId());
 
@@ -167,11 +182,15 @@ class PlaceRepositoryImplTest extends AbstractDaoITTest {
         Set<Long> categoriesId = new HashSet<>();
         categoriesId.add(category.getId());
 
-        Place place = placeRepository.save(new Place(null, name, imagesId, categoriesId, null, LocalDateTime.now(), pageLink, longitude, latitude, placeState)).block();
+        Place place = placeRepository.save(new Place(null, name, imagesId, categoriesId, null, LocalDateTime.now(), pageLink, placeState,
+                new Address("street", "street", "locality", "adminLevel2",
+                        "adminLevel1", "country", "postalCode", longitude, latitude))).block();
         place.setName("anotherName");
         place.setPageLink("anotherPageLink");
-        place.setLongitude(10.0);
-        place.setLatitude(10.0);
+        Address address = place.getAddress();
+        address.setLongitude(10.0);
+        address.setLatitude(10.0);
+        place.setAddress(address);
         place.setPlaceState(placeState);
 
         Image image2 = imageRepository.save(new Image(null, new byte[]{}, LocalDateTime.now())).block();
@@ -188,8 +207,9 @@ class PlaceRepositoryImplTest extends AbstractDaoITTest {
         assertNotNull(updatedPlace);
         assertNotEquals(name, updatedPlace.getName());
         assertNotEquals(pageLink, updatedPlace.getPageLink());
-        assertNotEquals(longitude, updatedPlace.getLongitude());
-        assertNotEquals(latitude, updatedPlace.getLatitude());
+        Address updatedAddress = updatedPlace.getAddress();
+        assertNotEquals(longitude, updatedAddress.getLongitude());
+        assertNotEquals(latitude, updatedAddress.getLatitude());
         assertNotEquals(placeState, updatedPlace.getPlaceState());
         assertNotEquals(imagesId, updatedPlace.getImagesId());
         assertNotEquals(categoriesId, updatedPlace.getCategoriesId());
@@ -200,7 +220,9 @@ class PlaceRepositoryImplTest extends AbstractDaoITTest {
         // given
         Image image = imageRepository.save(new Image(null, new byte[]{}, LocalDateTime.now())).block();
         Category category = categoryRepository.save(new Category(null, "name")).block();
-        placeRepository.save(new Place(null, "name", Set.of(image.getId()), Set.of(category.getId()), null, LocalDateTime.now(), "link", 0.0, 0.0, PlaceState.APPROVED)).block();
+        placeRepository.save(new Place(null, "name", Set.of(image.getId()), Set.of(category.getId()), null, LocalDateTime.now(), "link", PlaceState.APPROVED,
+                new Address("street", "street", "locality", "adminLevel2",
+                        "adminLevel1", "country", "postalCode", 0.0, 0.0))).block();
 
         // when
         placeRepository.deleteAll().block();
@@ -216,7 +238,9 @@ class PlaceRepositoryImplTest extends AbstractDaoITTest {
         // given
         Image image = imageRepository.save(new Image(null, new byte[]{}, LocalDateTime.now())).block();
         Category category = categoryRepository.save(new Category(null, "name")).block();
-        Place place = placeRepository.save(new Place(null, "name", Set.of(image.getId()), Set.of(category.getId()), null, LocalDateTime.now(), "link", 0.0, 0.0, PlaceState.APPROVED)).block();
+        Place place = placeRepository.save(new Place(null, "name", Set.of(image.getId()), Set.of(category.getId()), null, LocalDateTime.now(), "link", PlaceState.APPROVED,
+                new Address("street", "street", "locality", "adminLevel2",
+                        "adminLevel1", "country", "postalCode", 0.0, 0.0))).block();
 
         // when
         placeRepository.deleteById(place.getId()).block();
