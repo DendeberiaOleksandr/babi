@@ -293,5 +293,18 @@ public class PlaceRepositoryImpl extends AbstractRepository implements PlaceRepo
     private static class PlaceTable {
         private static final String TABLE = "place";
         private static final String ID = "id";
+        private static final String NAME = "name";
+        private static final String ADDING_DATE = "adding_date";
+        private static final String PAGE_LINK = "page_link";
+        private static final String LONGITUDE = "longitude";
+        private static final String LATITUDE = "latitude";
+        private static final String PLACE_STATE = "place_state";
+        private static final String STREET_NUMBER = "street_number";
+        private static final String ROUTE = "route";
+        private static final String LOCALITY = "locality";
+        private static final String ADMINISTRATIVE_AREA_LEVEL_2 = "administrative_area_level_2";
+        private static final String ADMINISTRATIVE_AREA_LEVEL_1 = "administrative_area_level_1";
+        private static final String COUNTRY = "country";
+        private static final String POSTAL_CODE = "postal_code";
     }
 }

@@ -1,6 +1,5 @@
 package org.babi.backend.common.dao;
 
-import java.util.HashMap;
 import java.util.Map;
 
 public abstract class AbstractCriteria implements Criteria {
