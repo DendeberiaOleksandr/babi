@@ -63,7 +63,7 @@ public class PlaceRepositoryImpl extends AbstractRepository implements PlaceRepo
 
     @Override
     public Mono<Place> findById(Long id) {
-        return findAll(new PlaceCriteria(id)).switchIfEmpty(Mono.error(new ResourceNotFoundException(Place.class, "id", id))).single();
+        return findAll(PlaceCriteria.builder().placeId(id).build()).switchIfEmpty(Mono.error(new ResourceNotFoundException(Place.class, "id", id))).single();
     }
 
     private Flux<Place> findAll(PlaceCriteria placeCriteria) {

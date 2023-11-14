@@ -135,7 +135,7 @@ class PlaceRepositoryImplTest extends AbstractDaoITTest {
         Place place = placeRepository.save(new Place(null, "name", Set.of(image.getId()), Set.of(category.getId()), null, LocalDateTime.now(), "link", PlaceState.APPROVED,
                 new Address("street", "street", "locality", "adminLevel2",
                         "adminLevel1", "country", "postalCode", 0.0, 0.0))).block();
-        PlaceCriteria placeCriteria = new PlaceCriteria();
+        PlaceCriteria placeCriteria = PlaceCriteria.builder().build();
         placeCriteria.setCategoryId(category.getId() + 1);
 
         // when
@@ -154,7 +154,7 @@ class PlaceRepositoryImplTest extends AbstractDaoITTest {
         placeRepository.save(new Place(null, "name", Set.of(image.getId()), Set.of(category.getId()), null, LocalDateTime.now(), "link", PlaceState.APPROVED,
                 new Address("street", "street", "locality", "adminLevel2",
                         "adminLevel1", "country", "postalCode", 0.0, 0.0))).block();
-        PlaceCriteria placeCriteria = new PlaceCriteria();
+        PlaceCriteria placeCriteria = PlaceCriteria.builder().build();
         placeCriteria.setCategoryId(category.getId());
 
         // when
