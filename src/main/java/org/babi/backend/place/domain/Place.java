@@ -1,5 +1,6 @@
 package org.babi.backend.place.domain;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -29,6 +30,7 @@ public class Place {
     private Set<Long> imagesId;
     private Set<Long> categoriesId;
     private List<Category> categories;
+    @JsonFormat(pattern="yyyy-MM-dd HH:mm:ss")
     private LocalDateTime addingDate;
     private String pageLink;
     private PlaceState placeState;

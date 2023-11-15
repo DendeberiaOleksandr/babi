@@ -47,7 +47,7 @@ public class PlaceRepositoryImpl extends AbstractRepository implements PlaceRepo
 
     @Override
     public Mono<Long> count(PlaceCriteria placeCriteria) {
-        final StringBuilder sql = new StringBuilder("select count(*) " +
+        final StringBuilder sql = new StringBuilder("select count(distinct p.id) " +
                 "from place p " +
                 "join place_category pc " +
                 "on p.id = pc.place_id " +
@@ -117,6 +117,7 @@ public class PlaceRepositoryImpl extends AbstractRepository implements PlaceRepo
                         place.setAddingDate(placeRow.getAddingDate());
                         place.setAddress(placeRow.getAddress());
                         place.setPageLink(placeRow.getPageLink());
+                        place.setPlaceState(placeRow.getPlaceState());
                         Long categoryId = placeRow.getCategoryId();
                         categories.add(new Category(categoryId, placeRow.getCategoryName()));
                         categoriesId.add(categoryId);

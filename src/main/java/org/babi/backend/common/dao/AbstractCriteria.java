@@ -17,7 +17,7 @@ public abstract class AbstractCriteria implements Criteria {
 
     protected void mapOffsetLimitCriteriaToQueryArgs(Map<String, Object> args, StringBuilder sql) {
         if (page != null && size != null) {
-            long offset = page == 0 ? size : page * size;
+            long offset = page * size;
             sql.append(" offset :offset ");
             args.put("offset", offset);
             sql.append(" limit :limit ");
