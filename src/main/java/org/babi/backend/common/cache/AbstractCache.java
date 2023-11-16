@@ -1,5 +1,7 @@
 package org.babi.backend.common.cache;
 
+import com.github.benmanes.caffeine.cache.AsyncCacheLoader;
+import com.github.benmanes.caffeine.cache.AsyncLoadingCache;
 import com.github.benmanes.caffeine.cache.CacheLoader;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
@@ -14,54 +16,61 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.stream.Collectors;
 
 @Slf4j
 public abstract class AbstractCache<ID, K extends Entity<ID>> implements Cache<ID, K> {
 
-    private final CacheLoader<ID, K> asyncCacheLoader;
-    protected final LoadingCache<ID, K> cache;
+    private final AsyncCacheLoader<ID, K> asyncCacheLoader;
+    protected final AsyncLoadingCache<ID, K> cache;
     private final ReactiveRepository<ID, K> repository;
 
     public AbstractCache(ReactiveRepository<ID, K> repository) {
         this.repository = repository;
-        asyncCacheLoader = new CacheLoader<ID, K>() {
+        asyncCacheLoader = new AsyncCacheLoader<ID, K>() {
             @Override
-            public @Nullable K load(ID id) throws Exception {
-                return repository.findById(id).block();
+            public CompletableFuture<? extends Map<? extends ID, ? extends K>> asyncLoadAll(Set<? extends ID> keys, Executor executor) throws Exception {
+                return CompletableFuture.supplyAsync(() -> repository.findAllById(keys).toStream()
+                        .collect(Collectors.toMap(K::getId, k -> k)));
+            }
+
+            @Override
+            public CompletableFuture<? extends K> asyncLoad(ID id, Executor executor) throws Exception {
+                return repository.findById(id).toFuture();
             }
         };
         cache = Caffeine.newBuilder()
-                .build(asyncCacheLoader);
+                .buildAsync(asyncCacheLoader);
     }
 
     @PostConstruct
-    public void init() {
-        repository.findAll(null)
+    public Mono<Void> init() {
+        return repository.findAll(null)
                 .flatMap(this::put)
-                .then()
-                .block();
-        log.info("Cache loaded for {}. Size: {}", this.getClass().getCanonicalName(), cache.asMap().size());
+                .then(Mono.fromRunnable(() -> log.info("Cache loaded for {}. Size: {}", this.getClass().getCanonicalName(), cache.asMap().size())));
     }
 
     @Override
     public Flux<K> getAll() {
-        return Flux.fromStream(cache.asMap()
-                .values()
-                .stream());
+        return Flux.fromStream(cache.asMap().values().stream())
+                .map(CompletableFuture::join);
     }
 
     @Override
     public Flux<K> getAllById(Set<? extends ID> ids) {
         return Flux.fromStream(
-                cache.getAll(ids).values().stream()
+                cache.getAll(ids).join().values().stream()
         );
     }
 
     @Override
     public Mono<K> findById(ID id) {
         return Mono.just(
-                cache.get(id)
+                cache.get(id).join()
         );
     }
 
@@ -69,7 +78,7 @@ public abstract class AbstractCache<ID, K extends Entity<ID>> implements Cache<I
     public Mono<K> put(K k) {
         return Mono.just(k)
                 .map(entity -> {
-                    cache.put(k.getId(), k);
+                    cache.put(k.getId(), Mono.just(k).toFuture());
                     return entity;
                 });
     }
@@ -77,12 +86,14 @@ public abstract class AbstractCache<ID, K extends Entity<ID>> implements Cache<I
     @Override
     public Mono<K> remove(ID id) {
         return Mono.just(cache)
-                .map(LoadingCache::asMap)
-                .map(map -> map.remove(id));
+                .map(AsyncLoadingCache::asMap)
+                .map(map -> map.remove(id).join());
     }
 
     public abstract Mono<Void> handleEntitySavedEvent(EntitySavedEvent<? extends K> entitySavedEvent);
+
     public abstract Mono<Void> handleEntityRemovedEvent(EntityRemovedEvent<? extends K> entityRemovedEvent);
+
     protected Mono<? extends K> getEntityFromEvent(EntityEvent<? extends K> entityEvent) {
         return Mono.just(entityEvent).map(EntityEvent::getEntity);
     }
