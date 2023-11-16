@@ -3,6 +3,7 @@ package org.babi.backend.category.dao;
 import org.babi.backend.category.domain.Category;
 import org.babi.backend.common.dao.AbstractRepository;
 import org.babi.backend.common.dao.Criteria;
+import org.babi.backend.common.dao.PageableResponse;
 import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
@@ -20,15 +21,20 @@ public class CategoryRepositoryImpl extends AbstractRepository<Long, Category> i
     }
 
     @Override
-    public Flux<Category> findAll(Criteria criteria) {
-        return databaseClient.sql(SELECT_QUERY)
-                .map((row, rowMetadata) -> new Category(row.get("id", Long.class), row.get("name", String.class)))
-                .all();
+    public Flux<Category> findAll() {
+        return findAll(null);
     }
 
     @Override
     public Flux<Category> findAllById(Set<? extends Long> id) {
         return findAll(CategoryCriteria.builder().ids(id).build());
+    }
+
+    private Flux<Category> findAll(CategoryCriteria criteria) {
+        StringBuilder sql = new StringBuilder(SELECT_QUERY);
+        DatabaseClient.GenericExecuteSpec executeSpec = executeSpecFilledByArgs(sql, criteria);
+        return executeSpec.map((row, rowMetadata) -> new Category(row.get("id", Long.class), row.get("name", String.class)))
+                .all();
     }
 
     @Override
@@ -49,7 +55,7 @@ public class CategoryRepositoryImpl extends AbstractRepository<Long, Category> i
     }
 
     @Override
-    public Mono<Void> remove(Long id) {
+    public Mono<Void> delete(Long id) {
         return databaseClient.sql("delete from category where id = :id")
                 .bind("id", id)
                 .fetch()
@@ -58,8 +64,8 @@ public class CategoryRepositoryImpl extends AbstractRepository<Long, Category> i
     }
 
     @Override
-    public Mono<Void> remove(Category category) {
-        return remove(category.getId());
+    public Mono<Void> delete(Category category) {
+        return delete(category.getId());
     }
 
     @Override
@@ -78,5 +84,23 @@ public class CategoryRepositoryImpl extends AbstractRepository<Long, Category> i
                 .fetch()
                 .all()
                 .then();
+    }
+
+    @Override
+    public Mono<PageableResponse<Category>> search(Criteria criteria) {
+        return findAll((CategoryCriteria) criteria)
+                .collectList()
+                .flatMap(categories -> count(criteria).map(count -> new PageableResponse<>(categories, count)));
+    }
+
+    @Override
+    public Mono<Long> count(Criteria criteria) {
+        final StringBuilder sql = new StringBuilder("select count(*) from category");
+
+        DatabaseClient.GenericExecuteSpec executeSpec = executeSpecFilledByArgs(sql, criteria);
+
+        return executeSpec
+                .map((row, rowMetadata) -> row.get(0, Long.class))
+                .first();
     }
 }
