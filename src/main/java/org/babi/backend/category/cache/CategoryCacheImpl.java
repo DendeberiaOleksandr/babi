@@ -2,9 +2,11 @@ package org.babi.backend.category.cache;
 
 import org.babi.backend.category.dao.CategoryRepository;
 import org.babi.backend.category.domain.Category;
+import org.babi.backend.category.domain.event.CategoryChangedEvent;
 import org.babi.backend.category.domain.event.CategoryRemovedEvent;
 import org.babi.backend.category.domain.event.CategorySavedEvent;
 import org.babi.backend.common.cache.AbstractCache;
+import org.babi.backend.common.domain.event.EntityChangedEvent;
 import org.babi.backend.common.domain.event.EntityRemovedEvent;
 import org.babi.backend.common.domain.event.EntitySavedEvent;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,7 +28,7 @@ public class CategoryCacheImpl extends AbstractCache<Long, Category> {
     @Override
     public Mono<Void> handleEntitySavedEvent(EntitySavedEvent<? extends Category> categorySavedEvent) {
         return getEntityFromEvent(categorySavedEvent)
-                .map(super::put)
+                .flatMap(super::put)
                 .then();
     }
 
@@ -37,5 +39,20 @@ public class CategoryCacheImpl extends AbstractCache<Long, Category> {
         return getEntityFromEvent(entityRemovedEvent)
                 .flatMap(category -> remove(category.getId()))
                 .then();
+    }
+
+    @Override
+    public Class<? extends EntityRemovedEvent> getEntityRemovedEventClass() {
+        return CategoryRemovedEvent.class;
+    }
+
+    @Override
+    public Class<? extends EntitySavedEvent> getEntitySavedEventClass() {
+        return CategorySavedEvent.class;
+    }
+
+    @Override
+    public Class<? extends EntityChangedEvent> getEntityChangedEventClass() {
+        return CategoryChangedEvent.class;
     }
 }

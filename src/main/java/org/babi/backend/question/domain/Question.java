@@ -39,19 +39,4 @@ public class Question implements Entity<Long> {
     private List<Question> previousQuestions;
     private int x;
     private int y;
-
-    @Override
-    public Class<? extends EntityRemovedEvent> getEntityRemovedEventClass() {
-        throw new UnsupportedOperationException("Method is not supported yet");
-    }
-
-    @Override
-    public Class<? extends EntitySavedEvent> getEntitySavedEventClass() {
-        throw new UnsupportedOperationException("Method is not supported yet");
-    }
-
-    @Override
-    public Class<? extends EntityChangedEvent> getEntityChangedEventClass() {
-        throw new UnsupportedOperationException("Method is not supported yet");
-    }
 }

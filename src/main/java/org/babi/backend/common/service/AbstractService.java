@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.babi.backend.common.cache.Cache;
 import org.babi.backend.common.dao.ReactiveRepository;
 import org.babi.backend.common.domain.Entity;
+import org.babi.backend.common.domain.event.EntitySavedEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -47,8 +48,8 @@ public abstract class AbstractService<ID, T extends Entity<ID>> implements React
                 .map(savedT -> {
                     try {
                         applicationEventPublisher
-                                .publishEvent(t.getEntitySavedEventClass()
-                                        .getConstructor(Entity.class).newInstance(t));
+                                .publishEvent(cache.getEntitySavedEventClass()
+                                        .getConstructors()[0].newInstance(t));
                     } catch (Exception e) {
                         log.error(e.getMessage());
                         throw new RuntimeException(e);
@@ -63,7 +64,7 @@ public abstract class AbstractService<ID, T extends Entity<ID>> implements React
                 .flatMap(t -> cache.remove(id))
                 .map(t -> {
                     try {
-                        applicationEventPublisher.publishEvent(t.getEntityRemovedEventClass().getConstructor(Entity.class).newInstance(t));
+                        applicationEventPublisher.publishEvent(cache.getEntityRemovedEventClass().getConstructor(Entity.class).newInstance(t));
                     } catch (Exception e) {
                         log.error(e.getMessage());
                         throw new RuntimeException(e);
@@ -77,7 +78,7 @@ public abstract class AbstractService<ID, T extends Entity<ID>> implements React
         return repository.update(id, t)
                 .map(entity -> {
                     try {
-                        applicationEventPublisher.publishEvent(t.getEntityChangedEventClass().getConstructor(Entity.class).newInstance(t));
+                        applicationEventPublisher.publishEvent(cache.getEntityChangedEventClass().getConstructor(Entity.class).newInstance(t));
                     } catch (Exception e) {
                         log.error(e.getMessage());
                         throw new RuntimeException(e);

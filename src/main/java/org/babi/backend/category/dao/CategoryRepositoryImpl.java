@@ -13,7 +13,7 @@ import java.util.Set;
 @Repository
 public class CategoryRepositoryImpl extends AbstractRepository<Long, Category> implements CategoryRepository {
 
-    private static final String SELECT_QUERY = "select c.id, c.name from category c";
+    private static final String SELECT_QUERY = "select id, name from category c";
 
     public CategoryRepositoryImpl(DatabaseClient databaseClient) {
         super(databaseClient);
