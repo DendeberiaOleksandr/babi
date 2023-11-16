@@ -8,6 +8,10 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.babi.backend.category.domain.Category;
+import org.babi.backend.common.domain.Entity;
+import org.babi.backend.common.domain.event.EntityChangedEvent;
+import org.babi.backend.common.domain.event.EntityRemovedEvent;
+import org.babi.backend.common.domain.event.EntitySavedEvent;
 import org.babi.backend.image.domain.Image;
 
 import java.util.List;
@@ -20,7 +24,7 @@ import java.util.Set;
 @ToString(exclude = { "image", "categories", "previousQuestions" })
 @EqualsAndHashCode(exclude = { "image", "categories",  "previousQuestions" })
 @Builder
-public class Question {
+public class Question implements Entity<Long> {
 
     private Long id;
     private String text;
@@ -35,4 +39,19 @@ public class Question {
     private List<Question> previousQuestions;
     private int x;
     private int y;
+
+    @Override
+    public Class<? extends EntityRemovedEvent> getEntityRemovedEventClass() {
+        throw new UnsupportedOperationException("Method is not supported yet");
+    }
+
+    @Override
+    public Class<? extends EntitySavedEvent> getEntitySavedEventClass() {
+        throw new UnsupportedOperationException("Method is not supported yet");
+    }
+
+    @Override
+    public Class<? extends EntityChangedEvent> getEntityChangedEventClass() {
+        throw new UnsupportedOperationException("Method is not supported yet");
+    }
 }

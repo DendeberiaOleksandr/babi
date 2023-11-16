@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.ToString;
 import org.babi.backend.category.domain.Category;
 import org.babi.backend.common.dao.AbstractRepository;
+import org.babi.backend.common.dao.Criteria;
 import org.babi.backend.common.dao.PageableResponse;
 import org.babi.backend.common.exception.ResourceNotFoundException;
 import org.babi.backend.place.domain.Address;
@@ -26,7 +27,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Repository
-public class PlaceRepositoryImpl extends AbstractRepository implements PlaceRepository {
+public class PlaceRepositoryImpl extends AbstractRepository<Long, Place> implements PlaceRepository {
 
     @Autowired
     public PlaceRepositoryImpl(DatabaseClient databaseClient) {
@@ -62,11 +63,17 @@ public class PlaceRepositoryImpl extends AbstractRepository implements PlaceRepo
     }
 
     @Override
+    public Flux<Place> findAllById(Set<? extends Long> id) {
+        return null;
+    }
+
+    @Override
     public Mono<Place> findById(Long id) {
         return findAll(PlaceCriteria.builder().placeId(id).build()).switchIfEmpty(Mono.error(new ResourceNotFoundException(Place.class, "id", id))).single();
     }
 
-    private Flux<Place> findAll(PlaceCriteria placeCriteria) {
+    @Override
+    public Flux<Place> findAll(Criteria criteria) {
         final StringBuilder sql = new StringBuilder("select p.id, p.name, p.adding_date, p.page_link, p.longitude, p.latitude, p.place_state, " +
                 "p.street_number, p.route, p.locality, p.administrative_area_level_2, p.administrative_area_level_1, p.country, p.postal_code, " +
                 "c.id as category_id, c.name as category_name, " +
@@ -79,7 +86,7 @@ public class PlaceRepositoryImpl extends AbstractRepository implements PlaceRepo
                 "join place_image pi2 " +
                 "on p.id = pi2.place_id");
 
-        DatabaseClient.GenericExecuteSpec executeSpec = executeSpecFilledByArgs(sql, placeCriteria);
+        DatabaseClient.GenericExecuteSpec executeSpec = executeSpecFilledByArgs(sql, criteria);
 
         return executeSpec
                 .map((row, rowMetadata) -> new PlaceCategoryImageRow(
@@ -153,6 +160,21 @@ public class PlaceRepositoryImpl extends AbstractRepository implements PlaceRepo
                 .flatMap(result -> linkCategories(place.getId(), place.getCategoriesId()))
                 .flatMap(placeId -> linkImages(placeId, place.getImagesId()))
                 .thenReturn(place);
+    }
+
+    @Override
+    public Mono<Void> remove(Long id) {
+        return deleteById(id);
+    }
+
+    @Override
+    public Mono<Void> remove(Place place) {
+        return deleteById(place.getId());
+    }
+
+    @Override
+    public Mono<Place> update(Long id, Place place) {
+        return update(place);
     }
 
     private DatabaseClient.GenericExecuteSpec bindNullableParametersForInsertQuery(DatabaseClient.GenericExecuteSpec executeSpec, Place place) {

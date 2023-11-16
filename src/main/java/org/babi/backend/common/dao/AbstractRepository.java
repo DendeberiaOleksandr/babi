@@ -3,6 +3,7 @@ package org.babi.backend.common.dao;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.babi.backend.common.domain.Entity;
 import org.babi.backend.common.util.StringUtils;
 import org.springframework.data.util.Pair;
 import org.springframework.r2dbc.core.DatabaseClient;
@@ -15,7 +16,7 @@ import java.util.Map;
 import java.util.Set;
 
 @Slf4j
-public abstract class AbstractRepository<T, K> {
+public abstract class AbstractRepository<T, K extends Entity<T>> implements ReactiveRepository<T, K> {
 
     protected DatabaseClient databaseClient;
 
@@ -33,11 +34,11 @@ public abstract class AbstractRepository<T, K> {
         return bindArgsToExecuteSpec(executeSpec, args);
     }
 
-    protected Mono<T> linkNestedEntities(String tableName, T id, Set<K> nestedIds, String identifierColumn, String nestedColumn) {
+    protected Mono<T> linkNestedEntities(String tableName, T id, Set<T> nestedIds, String identifierColumn, String nestedColumn) {
         return linkNestedEntities(tableName, id, nestedIds, identifierColumn, nestedColumn, StringUtils.toCamelCase(identifierColumn), StringUtils.toCamelCase(nestedColumn));
     }
 
-    protected Mono<T> linkNestedEntities(String tableName, T id, Set<K> nestedIds, String identifierColumn, String nestedColumn, String identifiedBindParam, String nestedIdBindParam) {
+    protected Mono<T> linkNestedEntities(String tableName, T id, Set<T> nestedIds, String identifierColumn, String nestedColumn, String identifiedBindParam, String nestedIdBindParam) {
         Pair<String, Map<String, Object>> sqlArgumentsPair;
         try {
             sqlArgumentsPair = DaoUtil.buildLinkQuery(tableName, id, nestedIds, identifierColumn, nestedColumn, identifiedBindParam, nestedIdBindParam);
@@ -69,11 +70,11 @@ public abstract class AbstractRepository<T, K> {
                 .all();
     }
 
-    protected Mono<T> unlinkNestedEntities(String tableName, T id, Set<K> nestedIds, String identifierColumn, String nestedColumn) {
+    protected Mono<T> unlinkNestedEntities(String tableName, T id, Set<T> nestedIds, String identifierColumn, String nestedColumn) {
         return unlinkNestedEntities(tableName, id, nestedIds, identifierColumn, StringUtils.toCamelCase(identifierColumn), nestedColumn, StringUtils.toCamelCase(nestedColumn));
     }
 
-    protected Mono<T> unlinkNestedEntities(String tableName, T id, Set<K> nestedIds, String identifierColumn, String identifierBind, String nestedColumn, String nestedIdentifierBind) {
+    protected Mono<T> unlinkNestedEntities(String tableName, T id, Set<T> nestedIds, String identifierColumn, String identifierBind, String nestedColumn, String nestedIdentifierBind) {
         Pair<String, Map<String, Object>> sqlArgumentsPair;
         try {
             sqlArgumentsPair = DaoUtil.buildUnlinkQuery(tableName, id, nestedIds, identifierColumn, identifierBind, nestedColumn, nestedIdentifierBind);

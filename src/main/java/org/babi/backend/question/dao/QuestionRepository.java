@@ -1,13 +1,13 @@
 package org.babi.backend.question.dao;
 
+import org.babi.backend.common.dao.ReactiveRepository;
 import org.babi.backend.question.domain.Question;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.List;
 import java.util.Set;
 
-public interface QuestionRepository {
+public interface QuestionRepository extends ReactiveRepository<Long, Question> {
 
     Flux<Question> findAll();
     Flux<Long> findPreviousQuestionsId(Long questionId);

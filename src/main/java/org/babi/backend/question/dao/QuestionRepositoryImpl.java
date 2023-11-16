@@ -4,6 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.babi.backend.category.domain.Category;
 import org.babi.backend.common.dao.AbstractRepository;
+import org.babi.backend.common.dao.Criteria;
+import org.babi.backend.common.domain.Entity;
 import org.babi.backend.common.exception.ResourceNotFoundException;
 import org.babi.backend.question.domain.Question;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,7 +23,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Repository
-public class QuestionRepositoryImpl extends AbstractRepository implements QuestionRepository {
+public class QuestionRepositoryImpl extends AbstractRepository<Long, Question> implements QuestionRepository {
 
     @Autowired
     public QuestionRepositoryImpl(DatabaseClient databaseClient) {
@@ -104,6 +106,16 @@ public class QuestionRepositoryImpl extends AbstractRepository implements Questi
     }
 
     @Override
+    public Flux<Question> findAll(Criteria criteria) {
+        return null;
+    }
+
+    @Override
+    public Flux findAllById(Set id) {
+        return null;
+    }
+
+    @Override
     public Mono<Question> save(Question question) {
         return databaseClient.sql("insert into question(text, icon_id) values (:text, :iconId)")
                 .bind("text", question.getText())
@@ -115,6 +127,21 @@ public class QuestionRepositoryImpl extends AbstractRepository implements Questi
                 .flatMap(questionId -> linkPreviousQuestions(questionId, question.getPreviousQuestionsId()))
                 .thenReturn(question);
 
+    }
+
+    @Override
+    public Mono<Void> remove(Long aLong) {
+        return null;
+    }
+
+    @Override
+    public Mono<Void> remove(Question question) {
+        return null;
+    }
+
+    @Override
+    public Mono<Question> update(Long aLong, Question question) {
+        return null;
     }
 
     @Override

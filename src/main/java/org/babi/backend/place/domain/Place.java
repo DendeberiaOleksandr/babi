@@ -9,6 +9,10 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.babi.backend.category.domain.Category;
+import org.babi.backend.common.domain.Entity;
+import org.babi.backend.common.domain.event.EntityChangedEvent;
+import org.babi.backend.common.domain.event.EntityRemovedEvent;
+import org.babi.backend.common.domain.event.EntitySavedEvent;
 import org.springframework.data.annotation.Id;
 
 import java.time.LocalDateTime;
@@ -22,7 +26,7 @@ import java.util.Set;
 @ToString(exclude = { "categories" })
 @EqualsAndHashCode(exclude = { "categories" })
 @Builder
-public class Place {
+public class Place implements Entity<Long> {
 
     @Id
     private Long id;
@@ -36,4 +40,18 @@ public class Place {
     private PlaceState placeState;
     private Address address;
 
+    @Override
+    public Class<? extends EntityRemovedEvent> getEntityRemovedEventClass() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Class<? extends EntitySavedEvent> getEntitySavedEventClass() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Class<? extends EntityChangedEvent> getEntityChangedEventClass() {
+        throw new UnsupportedOperationException();
+    }
 }

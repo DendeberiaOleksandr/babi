@@ -1,13 +1,14 @@
 package org.babi.backend.place.dao;
 
 import org.babi.backend.common.dao.PageableResponse;
+import org.babi.backend.common.dao.ReactiveRepository;
 import org.babi.backend.place.domain.Place;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.Set;
 
-public interface PlaceRepository {
+public interface PlaceRepository extends ReactiveRepository<Long, Place> {
 
     Mono<PageableResponse<Place>> search(PlaceCriteria placeCriteria);
     Flux<Place> findAll();
