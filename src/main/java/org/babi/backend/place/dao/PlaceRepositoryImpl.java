@@ -57,10 +57,7 @@ public class PlaceRepositoryImpl extends AbstractRepository<Long, Place> impleme
                 "on pc.category_id = c.id " +
                 "join place_image pi2 " +
                 "on p.id = pi2.place_id");
-        DatabaseClient.GenericExecuteSpec executeSpec = executeSpecFilledByArgs(sql, criteria);
-        return executeSpec
-                .map((row, rowMetadata) -> row.get(0, Long.class))
-                .first();
+        return count(sql, criteria);
     }
 
     @Override

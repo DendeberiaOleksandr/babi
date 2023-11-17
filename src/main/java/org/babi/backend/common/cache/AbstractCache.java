@@ -48,10 +48,11 @@ public abstract class AbstractCache<ID, K extends Entity<ID>> implements Cache<I
     }
 
     @PostConstruct
-    public Mono<Void> init() {
-        return repository.findAll(null)
+    public void init() {
+        repository.findAll()
                 .flatMap(this::put)
-                .then(Mono.fromRunnable(() -> log.info("Cache loaded for {}. Size: {}", this.getClass().getCanonicalName(), cache.asMap().size())));
+                .then(Mono.fromRunnable(() -> log.info("Cache loaded for {}. Size: {}", this.getClass().getCanonicalName(), cache.asMap().size())))
+                .block();
     }
 
     @Override

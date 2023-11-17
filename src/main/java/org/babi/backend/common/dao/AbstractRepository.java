@@ -24,6 +24,12 @@ public abstract class AbstractRepository<T, K extends Entity<T>> implements Reac
         this.databaseClient = databaseClient;
     }
 
+    protected Mono<Long> count(StringBuilder sql, Criteria criteria) {
+        return executeSpecFilledByArgs(sql, criteria)
+                .map((row, rowMetadata) -> row.get(0, Long.class))
+                .first();
+    }
+
     protected DatabaseClient.GenericExecuteSpec executeSpecFilledByArgs(StringBuilder sql, Criteria criteria) {
         Map<String, Object> args = new HashMap<>();
         if (criteria != null) {

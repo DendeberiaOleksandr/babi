@@ -45,7 +45,7 @@ public class QuestionServiceImpl implements QuestionService {
     @Transactional
     @Override
     public Mono<Long> update(Question question) {
-        return questionRepository.update(question).map(Question::getId);
+        return questionRepository.update(question.getId(), question).map(Question::getId);
     }
 
     @Transactional
@@ -57,7 +57,7 @@ public class QuestionServiceImpl implements QuestionService {
 
     @Override
     public Mono<Void> deleteById(Long id) {
-        return questionRepository.deleteById(id);
+        return questionRepository.delete(id);
     }
 
 
