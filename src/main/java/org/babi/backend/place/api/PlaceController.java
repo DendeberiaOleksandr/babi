@@ -55,7 +55,7 @@ public class PlaceController {
 
     @Secured("hasRole('ADMIN')")
     @PutMapping("/{id}")
-    public Mono<ResponseEntity<Long>> update(@PathVariable Long placeId, @RequestBody Place place) {
+    public Mono<ResponseEntity<Long>> update(@PathVariable Long id, @RequestBody Place place) {
         return placeService.update(place).map(ResponseEntity::ok);
     }
 
