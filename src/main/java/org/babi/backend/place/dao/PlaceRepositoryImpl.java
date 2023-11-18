@@ -112,7 +112,7 @@ public class PlaceRepositoryImpl extends AbstractRepository<Long, Place> impleme
                 .map(placeCategoryImageRows -> placeCategoryImageRows.stream().collect(Collectors.groupingBy(PlaceCategoryImageRow::getId)))
                 .flatMapMany(places -> Flux.fromStream(places.values().stream().map(placesRows -> {
                     Place place = new Place();
-                    List<Category> categories = new ArrayList<>();
+                    Set<Category> categories = new HashSet<>();
                     Set<Long> categoriesId = new HashSet<>();
                     Set<Long> imagesId = new HashSet<>();
                     placesRows.forEach(placeRow -> {
@@ -127,7 +127,7 @@ public class PlaceRepositoryImpl extends AbstractRepository<Long, Place> impleme
                         categoriesId.add(categoryId);
                         imagesId.add(placeRow.getImageId());
                     });
-                    place.setCategories(categories);
+                    place.setCategories(categories.stream().toList());
                     place.setCategoriesId(categoriesId);
                     place.setImagesId(imagesId);
                     return place;
