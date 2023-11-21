@@ -1,10 +1,13 @@
 package org.babi.backend.category.dao;
 
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import org.babi.backend.common.dao.AbstractCriteria;
+import org.babi.backend.common.dao.DaoUtil;
+import org.springframework.data.util.Pair;
+import org.springframework.util.CollectionUtils;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -17,6 +20,24 @@ public class CategoryCriteria extends AbstractCriteria {
 
     @Override
     public Map<String, Object> mapCriteriaToQueryArgs(StringBuilder sql) {
-        return null;
+        Map<String, Object> args = new HashMap<>();
+        boolean whereClauseAdded = false;
+
+        if (id != null) {
+            appendWhereOrAndClause(whereClauseAdded, sql);
+            whereClauseAdded = true;
+            sql.append("id = :id");
+            args.put("id", id);
+        }
+
+        if (!CollectionUtils.isEmpty(ids)) {
+            appendWhereOrAndClause(whereClauseAdded, sql);
+            whereClauseAdded = true;
+            Pair<String, Map<String, Object>> sqlArgs = DaoUtil.buildInStatementTuple(ids, "categoryId");
+            sql.append("id in ").append(sqlArgs.getFirst());
+            args.putAll(sqlArgs.getSecond());
+        }
+
+        return args;
     }
 }

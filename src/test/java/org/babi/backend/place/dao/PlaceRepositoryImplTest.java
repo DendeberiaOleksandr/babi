@@ -201,7 +201,7 @@ class PlaceRepositoryImplTest extends AbstractDaoITTest {
         place.getCategoriesId().add(category2.getId());
 
         // when
-        placeRepository.update(place).block();
+        placeRepository.update(place.getId(), place).block();
         Place updatedPlace = placeRepository.findAll().blockFirst();
 
         // then
@@ -244,7 +244,7 @@ class PlaceRepositoryImplTest extends AbstractDaoITTest {
                         "adminLevel1", "country", "postalCode", 0.0, 0.0))).block();
 
         // when
-        placeRepository.deleteById(place.getId()).block();
+        placeRepository.delete(place.getId()).block();
         List<Place> result = placeRepository.findAll().collectList().block();
 
         // then

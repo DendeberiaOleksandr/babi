@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class QuestionRepositoryImplITTest extends AbstractDaoITTest {
 
-    private QuestionRepository questionRepository;
+    private QuestionRepositoryImpl questionRepository;
 
     @Autowired
     private ImageRepository imageRepository;
@@ -303,7 +303,7 @@ class QuestionRepositoryImplITTest extends AbstractDaoITTest {
         question.setPreviousQuestionsId(Set.of(question2.getId(), question3.getId()));
 
         // when
-        Question updatedQuestion = questionRepository.update(question).block();
+        Question updatedQuestion = questionRepository.update(question.getId(), question).block();
 
         // then
         assertNotNull(updatedQuestion);
