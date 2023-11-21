@@ -3,6 +3,10 @@ babi:
     username: oleksandr.dendeberia@gmail.com
     password: gpty jtgn dans pyzq
   security:
+    cors:
+      allowedOrigins:
+        - http://localhost:3000
+        - http://localhost:8081
     publicRoutes:
       post: /api/v1/users,/api/v1/auth
     encryption:
