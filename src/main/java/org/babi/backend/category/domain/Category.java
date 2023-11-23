@@ -7,21 +7,17 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.relational.core.mapping.Table;
+import org.babi.backend.common.domain.Entity;
 
 @AllArgsConstructor
 @NoArgsConstructor
-@Table("category")
 @Setter
 @Getter
 @EqualsAndHashCode
 @ToString
 @Builder
-public class Category {
+public class Category implements Entity<Long> {
 
-    @Id
     private Long id;
     private String name;
-
 }

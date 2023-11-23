@@ -4,11 +4,14 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.babi.backend.category.domain.Category;
 import org.babi.backend.common.dao.AbstractRepository;
+import org.babi.backend.common.dao.Criteria;
+import org.babi.backend.common.dao.PageableResponse;
 import org.babi.backend.common.exception.ResourceNotFoundException;
 import org.babi.backend.question.domain.Question;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Repository;
+import org.testcontainers.shaded.com.google.common.annotations.VisibleForTesting;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -21,7 +24,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Repository
-public class QuestionRepositoryImpl extends AbstractRepository implements QuestionRepository {
+public class QuestionRepositoryImpl extends AbstractRepository<Long, Question> implements QuestionRepository {
 
     @Autowired
     public QuestionRepositoryImpl(DatabaseClient databaseClient) {
@@ -29,13 +32,28 @@ public class QuestionRepositoryImpl extends AbstractRepository implements Questi
     }
 
     @Override
-    public Flux<Question> findAll() {
-        return findAll(null);
+    public Mono<PageableResponse<Question>> search(Criteria criteria) {
+        return findAll((QuestionCriteria) criteria)
+                .collectList()
+                .flatMap(questions -> count(criteria).map(count -> new PageableResponse<>(questions, count)));
     }
 
     @Override
-    public Flux<Long> findPreviousQuestionsId(Long questionId) {
-        return findAllNestedIds(QuestionTreeTable.TABLE, QuestionTreeTable.QUESTION_ID, questionId, QuestionTreeTable.PREVIOUS_QUESTION_ID);
+    public Mono<Long> count(Criteria criteria) {
+        final StringBuilder sql = new StringBuilder("select count(distinct q.id) " +
+                "from question q " +
+                "join question_category qc " +
+                "on q.id = qc.question_id " +
+                "join category c " +
+                "on qc.category_id = c.id " +
+                "left join question_tree qt " +
+                "on q.id = qt.question_id");
+        return count(sql, criteria);
+    }
+
+    @Override
+    public Flux<Question> findAll() {
+        return findAll(null);
     }
 
     private Flux<Question> findAll(QuestionCriteria questionCriteria) {
@@ -104,6 +122,11 @@ public class QuestionRepositoryImpl extends AbstractRepository implements Questi
     }
 
     @Override
+    public Flux<Question> findAllById(Set<? extends Long> id) {
+        return null;
+    }
+
+    @Override
     public Mono<Question> save(Question question) {
         return databaseClient.sql("insert into question(text, icon_id) values (:text, :iconId)")
                 .bind("text", question.getText())
@@ -118,7 +141,11 @@ public class QuestionRepositoryImpl extends AbstractRepository implements Questi
     }
 
     @Override
-    public Mono<Question> update(Question question) {
+    public Mono<Question> update(Long aLong, Question question) {
+        return update(question);
+    }
+
+    private Mono<Question> update(Question question) {
         return databaseClient.sql("update question set text = :text, icon_id = :iconId, x = :x, y = :y where id = :id")
                 .bind("text", question.getText())
                 .bind("iconId", question.getIconId())
@@ -135,38 +162,43 @@ public class QuestionRepositoryImpl extends AbstractRepository implements Questi
                 .thenReturn(question);
     }
 
-    @Override
-    public Mono<Long> linkCategories(Long questionId, Set<Long> categoriesId) {
+    @VisibleForTesting
+    Flux<Long> findPreviousQuestionsId(Long questionId) {
+        return findAllNestedIds(QuestionTreeTable.TABLE, QuestionTreeTable.QUESTION_ID, questionId, QuestionTreeTable.PREVIOUS_QUESTION_ID);
+    }
+
+    @VisibleForTesting
+    Mono<Long> linkCategories(Long questionId, Set<Long> categoriesId) {
         return linkNestedEntities("question_category", questionId, categoriesId, "question_id", "category_id", "questionId", "categoryId");
     }
 
-    @Override
-    public Mono<Long> unlinkCategories(Long questionId, Set<Long> categoriesId) {
+    @VisibleForTesting
+    Mono<Long> unlinkCategories(Long questionId, Set<Long> categoriesId) {
         return unlinkNestedEntities("question_category", questionId, categoriesId, "question_id", "category_id");
     }
 
-    @Override
-    public Mono<Long> unlinkCategories(Long questionId) {
+    @VisibleForTesting
+    Mono<Long> unlinkCategories(Long questionId) {
         return unlinkNestedEntities(QuestionCategoryTable.TABLE, QuestionCategoryTable.QUESTION_ID, questionId);
     }
 
-    @Override
-    public Mono<Long> linkPreviousQuestions(Long questionId, Set<Long> previousQuestionId) {
+    @VisibleForTesting
+    Mono<Long> linkPreviousQuestions(Long questionId, Set<Long> previousQuestionId) {
         return linkNestedEntities(QuestionTreeTable.TABLE, questionId, previousQuestionId, QuestionTreeTable.QUESTION_ID, QuestionTreeTable.PREVIOUS_QUESTION_ID);
     }
 
-    @Override
-    public Mono<Long> unlinkPreviousQuestions(Long questionId, Set<Long> previousQuestionsId) {
+    @VisibleForTesting
+    Mono<Long> unlinkPreviousQuestions(Long questionId, Set<Long> previousQuestionsId) {
         return unlinkNestedEntities(QuestionTreeTable.TABLE, questionId, previousQuestionsId, QuestionTreeTable.QUESTION_ID, QuestionTreeTable.PREVIOUS_QUESTION_ID);
     }
 
-    @Override
-    public Mono<Long> unlinkPreviousQuestions(Long questionId) {
+    @VisibleForTesting
+    Mono<Long> unlinkPreviousQuestions(Long questionId) {
         return unlinkNestedEntities(QuestionTreeTable.TABLE, QuestionTreeTable.QUESTION_ID, questionId);
     }
 
-    @Override
-    public Flux<Long> getQuestionCategoriesId(Long questionId) {
+    @VisibleForTesting
+    Flux<Long> getQuestionCategoriesId(Long questionId) {
         return findAllNestedIds(QuestionCategoryTable.TABLE, QuestionCategoryTable.QUESTION_ID, questionId, QuestionCategoryTable.CATEGORY_ID);
     }
 
@@ -179,7 +211,12 @@ public class QuestionRepositoryImpl extends AbstractRepository implements Questi
     }
 
     @Override
-    public Mono<Void> deleteById(Long id) {
+    public Mono<Void> delete(Question question) {
+        return delete(question.getId());
+    }
+
+    @Override
+    public Mono<Void> delete(Long id) {
         return deleteById(List.of(
                 new DeleteByIdParam(QuestionCategoryTable.TABLE, QuestionCategoryTable.QUESTION_ID, id),
                 new DeleteByIdParam(QuestionTreeTable.TABLE, QuestionTreeTable.QUESTION_ID, id),

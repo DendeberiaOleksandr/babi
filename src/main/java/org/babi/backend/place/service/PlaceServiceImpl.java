@@ -46,7 +46,7 @@ public class PlaceServiceImpl implements PlaceService {
 
     @Override
     public Mono<Long> update(Place place) {
-        return placeRepository.update(place).map(Place::getId);
+        return placeRepository.update(place.getId(), place).map(Place::getId);
     }
 
     @Override
@@ -56,6 +56,6 @@ public class PlaceServiceImpl implements PlaceService {
 
     @Override
     public Mono<Void> deleteById(Long id) {
-        return placeRepository.deleteById(id);
+        return placeRepository.delete(id);
     }
 }

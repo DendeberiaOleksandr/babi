@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.babi.backend.category.domain.Category;
-import org.springframework.data.annotation.Id;
+import org.babi.backend.common.domain.Entity;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,9 +22,8 @@ import java.util.Set;
 @ToString(exclude = { "categories" })
 @EqualsAndHashCode(exclude = { "categories" })
 @Builder
-public class Place {
+public class Place implements Entity<Long> {
 
-    @Id
     private Long id;
     private String name;
     private Set<Long> imagesId;
@@ -35,5 +34,4 @@ public class Place {
     private String pageLink;
     private PlaceState placeState;
     private Address address;
-
 }

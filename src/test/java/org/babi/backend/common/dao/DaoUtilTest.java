@@ -5,11 +5,17 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.util.Pair;
 
+import java.lang.module.FindException;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -108,6 +114,40 @@ class DaoUtilTest {
         Pair<String, Object> bindPair = result.getSecond();
         assertEquals("column", bindPair.getFirst());
         assertEquals(1L, bindPair.getSecond());
+    }
+
+    @Test
+    void buildInStatementTuple_whenProvidedCollectionIsEmpty_thenReturnNull() {
+        // given
+
+        // when
+        Pair<String, Map<String, Object>> result = DaoUtil.buildInStatementTuple(Collections.EMPTY_LIST, null);
+
+        // then
+        assertNull(result);
+    }
+
+    @Test
+    void buildInStatementTuple_whenProvidedCollectionIsNotEmpty_thenBuild() {
+        // given
+        String param1 = "a";
+        String param2 = "b";
+        String param3 = "c";
+        String bindName = "bind";
+        String expectedSql = "(:bind0, :bind1, :bind2)";
+
+        // when
+        Pair<String, Map<String, Object>> result = DaoUtil.buildInStatementTuple(List.of(param1, param2, param3), bindName);
+
+        // then
+        assertNotNull(result);
+        String resultSql = result.getFirst();
+        assertNotNull(resultSql);
+        assertEquals(expectedSql, resultSql);
+        Map<String, Object> resultArgs = result.getSecond();
+        IntStream.range(0, 3)
+                        .forEach(index -> assertTrue(resultArgs.containsKey(bindName + index)));
+        Stream.of(param1, param2, param3).forEach(param -> assertTrue(resultArgs.containsValue(param)));
     }
 
 }

@@ -1,17 +1,16 @@
 package org.babi.backend.category.service;
 
 import org.babi.backend.category.domain.Category;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
+import org.babi.backend.common.cache.Cache;
+import org.babi.backend.common.dao.ReactiveRepository;
+import org.babi.backend.common.service.AbstractService;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
 
-public interface CategoryService {
+@Service
+public class CategoryService extends AbstractService<Long, Category> {
 
-    default Mono<Long> save(Mono<Category> category) {
-        return category.flatMap(this::save);
+    public CategoryService(Cache<Long, Category> cache, ReactiveRepository<Long, Category> repository, ApplicationEventPublisher applicationEventPublisher) {
+        super(cache, repository, applicationEventPublisher);
     }
-    Mono<Long> save(Category category);
-    Flux<Category> getAll();
-    Mono<Category> findById(Long id);
-    Mono<Category> update(Long id, Category category);
-    Flux<Category> findAllById(Iterable<Long> id);
 }

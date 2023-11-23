@@ -1,9 +1,12 @@
 package org.babi.backend.common.dao;
 
+import jakarta.annotation.Nonnull;
+import jakarta.annotation.Nullable;
 import org.babi.backend.common.util.StringUtils;
 import org.springframework.data.util.Pair;
 import org.springframework.util.CollectionUtils;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -65,6 +68,27 @@ public class DaoUtil {
     public static Pair<String, Pair<String, Object>> buildDeleteByIdQuery(String table, String identifierColumn, Object id) {
         String identifierBind = StringUtils.toCamelCase(identifierColumn);
         return Pair.of(String.format("delete from %s where %s = :%s", table, identifierColumn, identifierBind), Pair.of(identifierBind, id));
+    }
+
+    @Nullable
+    public static Pair<String, Map<String, Object>> buildInStatementTuple(Collection<?> values, @Nonnull String bindName) {
+        if (CollectionUtils.isEmpty(values)) {
+            return null;
+        }
+        StringBuilder sql = new StringBuilder("(");
+        Map<String, Object> args = new HashMap<>();
+        Object[] array = values.toArray();
+        IntStream.range(0, array.length)
+                .forEach(index -> {
+                    String bind = bindName + index;
+                    sql.append(String.format(":%s, ", bind));
+                    args.put(bind, array[index]);
+                });
+        int sqlLength = sql.length();
+        return Pair.of(
+                sql.replace(sqlLength - ENDING_COMMA_WITH_WHITESPACE_LENGTH, sqlLength, ")").toString(),
+                args
+        );
     }
 
 }

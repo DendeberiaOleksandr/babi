@@ -1,13 +1,12 @@
 package org.babi.backend.question.dao;
 
 import org.babi.backend.category.dao.CategoryRepository;
+import org.babi.backend.category.dao.CategoryRepositoryImpl;
 import org.babi.backend.category.domain.Category;
 import org.babi.backend.common.exception.ResourceNotFoundException;
 import org.babi.backend.dao.AbstractDaoITTest;
 import org.babi.backend.image.dao.ImageRepository;
 import org.babi.backend.image.domain.Image;
-import org.babi.backend.place.domain.Place;
-import org.babi.backend.place.domain.PlaceState;
 import org.babi.backend.question.domain.Question;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,22 +23,21 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class QuestionRepositoryImplITTest extends AbstractDaoITTest {
 
-    private QuestionRepository questionRepository;
+    private QuestionRepositoryImpl questionRepository;
 
     @Autowired
     private ImageRepository imageRepository;
 
-    @Autowired
     private CategoryRepository categoryRepository;
 
     @Autowired
     private DatabaseClient databaseClient;
 
     @Autowired
-    public QuestionRepositoryImplITTest(ImageRepository imageRepository, CategoryRepository categoryRepository, DatabaseClient databaseClient) {
+    public QuestionRepositoryImplITTest(ImageRepository imageRepository, DatabaseClient databaseClient) {
         this.questionRepository = new QuestionRepositoryImpl(databaseClient);
         this.imageRepository = imageRepository;
-        this.categoryRepository = categoryRepository;
+        this.categoryRepository = new CategoryRepositoryImpl(databaseClient);
         this.databaseClient = databaseClient;
     }
 
@@ -305,7 +303,7 @@ class QuestionRepositoryImplITTest extends AbstractDaoITTest {
         question.setPreviousQuestionsId(Set.of(question2.getId(), question3.getId()));
 
         // when
-        Question updatedQuestion = questionRepository.update(question).block();
+        Question updatedQuestion = questionRepository.update(question.getId(), question).block();
 
         // then
         assertNotNull(updatedQuestion);

@@ -1,6 +1,7 @@
 package org.babi.backend.place.dao;
 
 import org.babi.backend.category.dao.CategoryRepository;
+import org.babi.backend.category.dao.CategoryRepositoryImpl;
 import org.babi.backend.category.domain.Category;
 import org.babi.backend.common.exception.ResourceNotFoundException;
 import org.babi.backend.dao.AbstractDaoITTest;
@@ -29,10 +30,10 @@ class PlaceRepositoryImplTest extends AbstractDaoITTest {
     private CategoryRepository categoryRepository;
 
     @Autowired
-    public PlaceRepositoryImplTest(DatabaseClient databaseClient, ImageRepository imageRepository, CategoryRepository categoryRepository) {
+    public PlaceRepositoryImplTest(DatabaseClient databaseClient, ImageRepository imageRepository) {
         this.placeRepository = new PlaceRepositoryImpl(databaseClient);
         this.imageRepository = imageRepository;
-        this.categoryRepository = categoryRepository;
+        this.categoryRepository = new CategoryRepositoryImpl(databaseClient);
     }
 
     @BeforeEach
@@ -191,7 +192,7 @@ class PlaceRepositoryImplTest extends AbstractDaoITTest {
         address.setLongitude(10.0);
         address.setLatitude(10.0);
         place.setAddress(address);
-        place.setPlaceState(placeState);
+        place.setPlaceState(PlaceState.APPROVED);
 
         Image image2 = imageRepository.save(new Image(null, new byte[]{}, LocalDateTime.now())).block();
         place.getImagesId().add(image2.getId());
@@ -200,7 +201,7 @@ class PlaceRepositoryImplTest extends AbstractDaoITTest {
         place.getCategoriesId().add(category2.getId());
 
         // when
-        placeRepository.update(place).block();
+        placeRepository.update(place.getId(), place).block();
         Place updatedPlace = placeRepository.findAll().blockFirst();
 
         // then
@@ -243,7 +244,7 @@ class PlaceRepositoryImplTest extends AbstractDaoITTest {
                         "adminLevel1", "country", "postalCode", 0.0, 0.0))).block();
 
         // when
-        placeRepository.deleteById(place.getId()).block();
+        placeRepository.delete(place.getId()).block();
         List<Place> result = placeRepository.findAll().collectList().block();
 
         // then
